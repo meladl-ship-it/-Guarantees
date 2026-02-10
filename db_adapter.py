@@ -100,7 +100,50 @@ def connect_db():
             pass
 
     # SQLite connection
-    conn = sqlite3.connect(db_path(), timeout=10.0, check_same_thread=False)
+    db_file = db_path()
+    
+    # Initialize DB if missing (for cloud/web environment)
+    initialize_new = False
+    if not os.path.exists(db_file):
+        initialize_new = True
+        
+    conn = sqlite3.connect(db_file, timeout=10.0, check_same_thread=False)
+    
+    if initialize_new:
+        try:
+            # Create basic schema if DB is new
+            # Users table
+            conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                role TEXT DEFAULT 'user'
+            )
+            ''')
+            # Guarantees table
+            conn.execute('''
+            CREATE TABLE IF NOT EXISTS guarantees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                g_no TEXT UNIQUE,
+                beneficiary TEXT,
+                amount REAL,
+                currency TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                bank TEXT,
+                department TEXT,
+                user_status TEXT,
+                notes TEXT,
+                cash_flag INTEGER DEFAULT 0,
+                type TEXT
+            )
+            ''')
+            conn.commit()
+            print(f"Initialized new database at {db_file}")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+
     try:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA journal_mode=WAL")

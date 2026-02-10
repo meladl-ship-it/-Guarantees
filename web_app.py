@@ -261,11 +261,10 @@ def data_table():
 def index_logic(view_type='dashboard'):
     try:
         # Note: db_path check is only valid for local SQLite. 
-        # For cloud, we assume DB exists if connection works.
+        # For cloud, we assume DB exists or let connect_db handle creation.
         if not (os.environ.get('DATABASE_URL') and PSYCOPG2_AVAILABLE):
-            path = db_path()
-            if not os.path.exists(path):
-                 return f"<h1>Error: Database file not found</h1><p>Expected path: {path}</p>"
+            # Ensure DB exists by triggering connection (which creates it if needed for SQLite)
+            connect_db().close()
 
         conn = get_db_connection()
         
