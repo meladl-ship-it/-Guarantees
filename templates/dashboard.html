@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #2c3e50; /* Dark background as per screenshot */
+        color: #ecf0f1;
+    }
+    
+    /* Dashboard Title */
+    .dashboard-title {
+        text-align: center;
+        color: #3498db; /* Blue title */
+        font-weight: 700;
+        font-size: 2rem;
+        margin-bottom: 30px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* Top Stats Cards */
+    .stat-box {
+        background-color: #ecf0f1; /* Light background for cards */
+        border-radius: 10px;
+        padding: 5px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
+        color: #2c3e50;
+    }
+    
+    .stat-header {
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+        border: 2px solid;
+        border-radius: 5px;
+        padding: 5px;
+        background: white;
+    }
+    
+    .stat-value {
+        font-weight: 800;
+        font-size: 1.8rem;
+        margin-top: 5px;
+    }
+
+    /* Card Specific Colors */
+    .card-orange .stat-header { border-color: #e67e22; color: #e67e22; }
+    .card-orange .stat-value { color: #e67e22; }
+    
+    .card-green .stat-header { border-color: #27ae60; color: #27ae60; }
+    .card-green .stat-value { color: #27ae60; }
+    
+    .card-blue .stat-header { border-color: #3498db; color: #3498db; }
+    .card-blue .stat-value { color: #3498db; }
+
+    .card-yellow .stat-header { border-color: #f1c40f; color: #f1c40f; }
+    .card-yellow .stat-value { color: #f1c40f; }
+
+    .card-red .stat-header { border-color: #e74c3c; color: #e74c3c; }
+    .card-red .stat-value { color: #e74c3c; }
+
+    /* Section Panels */
+    .panel-dark {
+        background-color: #22303e; /* Slightly lighter than body */
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .panel-title {
+        color: #bdc3c7;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        text-align: right;
+        font-weight: 600;
+    }
+
+    /* Progress Bars Customization */
+    .progress-bar {
+        width: 0; /* Start at 0 for animation */
+        transition: width 1s ease-in-out;
+    }
+    
+    .progress-wrapper {
+        margin-bottom: 15px;
+    }
+    
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        color: #ecf0f1;
+        font-size: 0.85rem;
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+    
+    .progress {
+        height: 10px;
+        background-color: #34495e;
+        border-radius: 5px;
+    }
+    
+    /* Specific Bar Colors */
+    .bar-green { background-color: #27ae60; }
+    .bar-yellow { background-color: #f1c40f; }
+    .bar-red { background-color: #e74c3c; }
+    .bar-blue { background-color: #3498db; }
+    
+    /* Scrollable areas for lists */
+    .scrollable-panel {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #2c3e50; 
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #95a5a6; 
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="dashboard-title">نظرة عامة على الضمانات</h1>
+
+    <!-- Top Stats Row -->
+    <div class="row g-4 mb-4">
+        <!-- Active Guarantees (Orange) -->
+        <div class="col-md-4">
+            <div class="stat-box card-orange">
+                <div class="stat-header">الضمانات السارية</div>
+                <div class="stat-value">{{ net_active_count }}</div>
+                <div style="font-size: 0.9rem; margin-top: 5px; color: #e67e22; font-weight: bold;">{{ "{:,.2f}".format(net_total_amount) }}</div>
+            </div>
+        </div>
+        
+        <!-- Near Expiration (Yellow) -->
+        <div class="col-md-4">
+            <div class="stat-box card-yellow">
+                <div class="stat-header">قارب على الانتهاء</div>
+                <div class="stat-value">{{ near_expiry_count }}</div>
+                <div style="font-size: 0.9rem; margin-top: 5px; color: #f1c40f; font-weight: bold;">{{ "{:,.2f}".format(near_expiry_amount) }}</div>
+            </div>
+        </div>
+
+        <!-- Pending Bank (Red) -->
+        <div class="col-md-4">
+            <div class="stat-box card-red">
+                <div class="stat-header">انتهى في انتظار التأكيد</div>
+                <div class="stat-value">{{ pending_bank_count }}</div>
+                <div style="font-size: 0.9rem; margin-top: 5px; color: #e74c3c; font-weight: bold;">{{ "{:,.2f}".format(pending_bank_amount) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="row g-4">
+        <!-- Guarantee Status (Left in LTR, Right in RTL) -->
+        <div class="col-lg-5">
+            <div class="panel-dark h-100">
+                <div class="panel-title">حالة الضمانات</div>
+                
+                {% for stat in status_stats %}
+                <div class="progress-wrapper">
+                    <div class="progress-label">
+                        <span>{{ "{:,.2f}".format(stat.amount) }} ({{ "{:.1f}%".format(stat.percent) }})</span>
+                        <span>{{ stat.name }}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar 
+                            {% if stat.name == 'ساري' %}bar-green
+                            {% elif 'قارب' in stat.name %}bar-yellow
+                            {% elif 'انتظار' in stat.name %}bar-yellow
+                            {% elif 'منتهي' in stat.name %}bar-red
+                            {% else %}bar-blue{% endif %}" 
+                            role="progressbar" 
+                            data-width="{{ stat.percent }}%">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Top Banks (Right in LTR, Left in RTL) -->
+        <div class="col-lg-7">
+            <div class="panel-dark h-100">
+                <div class="panel-title">توزيع المبالغ حسب البنك (أعلى 5)</div>
+                
+                {% for bank in bank_stats_top5 %}
+                <div class="progress-wrapper">
+                    <div class="progress-label">
+                        <span>{{ "{:,.2f}".format(bank.amount) }} ({{ "{:.1f}%".format(bank.percent) }})</span>
+                        <span>{{ bank.name }}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bar-blue" role="progressbar" data-width="{{ bank.percent_relative }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="row mt-4">
+        <!-- Department Distribution -->
+        <div class="col-12">
+            <div class="panel-dark scrollable-panel">
+                <div class="panel-title">توزيع الضمانات حسب القسم</div>
+                
+                {% for dept in dept_stats %}
+                <div class="progress-wrapper">
+                    <div class="progress-label">
+                        <span>{{ dept.count }} ({{ "{:.1f}%".format(dept.percent_count) }}) | {{ "{:,.2f}".format(dept.amount) }}</span>
+                        <span><i class="fas fa-building me-2"></i> {{ dept.name }}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bar-blue" role="progressbar" data-width="{{ dept.percent_count }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Apply widths from data-width attribute to avoid inline style linter errors
+        var bars = document.querySelectorAll('[data-width]');
+        bars.forEach(function(bar) {
+            // Add a small delay for animation effect
+            setTimeout(function() {
+                bar.style.width = bar.getAttribute('data-width');
+            }, 100);
+        });
+    });
+</script>
+{% endblock %}
