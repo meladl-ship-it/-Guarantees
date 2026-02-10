@@ -208,6 +208,13 @@ def logout():
 
 @app.route('/api/sync', methods=['POST'])
 def sync_data():
+    # Ensure DB exists and is migrated before processing sync
+    # This covers cases where startup hook failed or filesystem is ephemeral
+    try:
+        ensure_db()
+    except Exception as e:
+        print(f"Error ensuring DB in sync: {e}")
+
     api_key = request.headers.get('X-API-Key')
     if api_key != os.environ.get('API_KEY'):
         return json.dumps({'error': 'Unauthorized'}), 401
