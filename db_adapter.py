@@ -82,6 +82,38 @@ def db_path():
     return str(base / "guarantees.db")
 
 
+def check_and_migrate_db():
+    """Ensure database schema is up to date."""
+    conn = connect_db()
+    try:
+        # Check if password_hash column exists in users table
+        is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+        
+        if is_postgres:
+            cursor = conn.cursor()
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='password_hash'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+                conn.commit()
+                print("Migrated: Added password_hash to users table (Postgres)")
+        else:
+            # SQLite
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(users)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'password_hash' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+                conn.commit()
+                print("Migrated: Added password_hash to users table (SQLite)")
+                
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+
 def connect_db():
     """Create a database connection.
     
@@ -112,13 +144,14 @@ def connect_db():
     if initialize_new:
         try:
             # Create basic schema if DB is new
-            # Users table
+            # Users table (Updated to include password_hash)
             conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
-                role TEXT DEFAULT 'user'
+                role TEXT DEFAULT 'user',
+                password_hash TEXT
             )
             ''')
             # Guarantees table

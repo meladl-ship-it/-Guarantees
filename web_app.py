@@ -10,10 +10,15 @@ from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Ensure we can import db_adapter from current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE
+from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE, check_and_migrate_db
+
+# Ensure DB schema is up to date (add password column if missing)
+check_and_migrate_db()
+
 if PSYCOPG2_AVAILABLE:
     import psycopg2.extras
 
@@ -127,26 +132,52 @@ class User(UserMixin):
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-            sql = normalize_query("SELECT * FROM users WHERE email = ?")
-            cursor.execute(sql, (email,))
+            cursor.execute(normalize_query("SELECT * FROM users WHERE email = ?"), (email,))
             user = cursor.fetchone()
             conn.close()
+            
             if user:
                 return User(id=user['id'], username=user['username'], email=user['email'], role=user['role'])
         except Exception as e:
             print(f"Error fetching user by email: {e}")
         return None
-        
+
     @staticmethod
-    def create(username, email, role='user'):
+    def get_by_username(username):
         try:
             conn = get_db_connection()
-            cursor = conn.cursor()
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+            cursor.execute(normalize_query("SELECT * FROM users WHERE username = ?"), (username,))
+            user = cursor.fetchone()
+            conn.close()
+            
+            if user:
+                # Return dict-like object to access password_hash outside
+                return user
+        except Exception as e:
+            print(f"Error fetching user by username: {e}")
+        return None
 
-            # Default active=1, no password hash for OAuth users initially
-            sql = normalize_query("INSERT INTO users (username, email, role, is_active, active) VALUES (?, ?, ?, 1, 1)")
-            cursor.execute(sql, (username, email, role))
-            conn.commit()
+    @staticmethod
+    def create(username, email, role='user', password=None):
+        try:
+            conn = get_db_connection()
+            
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+            
+            password_hash = generate_password_hash(password) if password else None
+            
+            cursor.execute(normalize_query("INSERT INTO users (username, email, role, password_hash) VALUES (?, ?, ?, ?)"), 
+                         (username, email, role, password_hash))
             
             # Handle fetching ID for new user
             if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
@@ -157,6 +188,7 @@ class User(UserMixin):
             else:
                 user_id = cursor.lastrowid
                 
+            conn.commit()
             conn.close()
             return User(id=user_id, username=username, email=email, role=role)
         except Exception as e:
@@ -173,6 +205,26 @@ def get_db_connection():
     # Use centralized adapter which handles local SQLite vs Cloud Postgres
     return connect_db()
 
+# Create tables if they don't exist
+with app.app_context():
+    try:
+        # Note: db_path check is only valid for local SQLite. 
+        # For cloud, we assume DB exists or let connect_db handle creation.
+        if not (os.environ.get('DATABASE_URL') and PSYCOPG2_AVAILABLE):
+            # Ensure DB exists by triggering connection (which creates it if needed for SQLite)
+            connect_db().close()
+
+        conn = get_db_connection()
+        
+        # Ensure default admin user exists
+        admin_user = User.get_by_username('admin')
+        if not admin_user:
+            print("Creating default admin user...")
+            User.create('admin', 'admin@example.com', 'admin', 'admin')
+            
+    except Exception as e:
+        print(f"Error checking DB: {e}")
+
 @app.route('/debug')
 def debug_info():
     return f"""
@@ -187,6 +239,26 @@ def debug_info():
 def welcome():
     # Pass mock status to template
     return render_template('welcome.html', user=current_user, mock_oauth=MOCK_OAUTH)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user_data = User.get_by_username(username)
+        
+        if user_data and user_data.get('password_hash') and check_password_hash(user_data['password_hash'], password):
+            user = User(id=user_data['id'], username=user_data['username'], email=user_data['email'], role=user_data['role'])
+            login_user(user)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
+            
+    return render_template('welcome.html', mock_oauth=MOCK_OAUTH)
 
 @app.route('/login/google')
 def login_google():
