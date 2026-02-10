@@ -120,24 +120,10 @@
                             <i class="fas fa-table"></i> سجل الضمانات
                         </a>
                     </li>
-                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'import_excel' %}active{% endif %}" href="{{ url_for('import_excel') }}">
-                            <i class="fas fa-file-import"></i> استيراد بيانات
-                        </a>
-                    </li>
-                    {% endif %}
                 </ul>
-                <div class="d-flex align-items-center">
-                    <span class="text-white-50 small ms-3">
-                        <i class="fas fa-calendar-alt"></i> {{ today_date }}
-                    </span>
-                    {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light ms-3">
-                        <i class="fas fa-sign-out-alt"></i> خروج
-                    </a>
-                    {% endif %}
-                </div>
+                <span class="text-white-50 small ms-3">
+                    <i class="fas fa-calendar-alt"></i> {{ today_date }}
+                </span>
             </div>
         </div>
     </nav>
