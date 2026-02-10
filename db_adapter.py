@@ -136,6 +136,16 @@ def connect_db():
     
     # Initialize DB if missing (for cloud/web environment)
     initialize_new = False
+    
+    # Ensure directory exists (critical for cloud deployment)
+    try:
+        db_dir = os.path.dirname(db_file)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"Created database directory: {db_dir}")
+    except Exception as e:
+        print(f"Error creating database directory: {e}")
+
     if not os.path.exists(db_file):
         initialize_new = True
         

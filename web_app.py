@@ -158,7 +158,8 @@ class User(UserMixin):
             
             if user:
                 # Return dict-like object to access password_hash outside
-                return user
+                # Convert sqlite3.Row to dict to ensure .get() works
+                return dict(user)
         except Exception as e:
             print(f"Error fetching user by username: {e}")
         return None
