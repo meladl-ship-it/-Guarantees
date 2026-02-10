@@ -155,25 +155,6 @@
                 </button>
             </form>
 
-            <div class="d-flex align-items-center justify-content-center mb-3">
-                <hr class="flex-grow-1 border-secondary">
-                <span class="px-2 text-white-50">أو</span>
-                <hr class="flex-grow-1 border-secondary">
-            </div>
-
-            <a href="{{ url_for('login_google') }}" class="btn btn-outline-light w-100 rounded-pill">
-                {% if mock_oauth %}
-                    <i class="fas fa-user-shield ms-2"></i> الدخول (وضع المطور)
-                {% else %}
-                    <i class="fab fa-google ms-2"></i> تسجيل الدخول بواسطة Google
-                {% endif %}
-            </a>
-            {% if mock_oauth %}
-                <p class="mt-3 text-warning small">
-                    <i class="fas fa-exclamation-triangle"></i> تنبيه: مفاتيح Google غير مضبوطة. سيتم استخدام تسجيل دخول تجريبي.
-                </p>
-            {% endif %}
-
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}

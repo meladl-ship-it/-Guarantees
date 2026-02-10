@@ -10,7 +10,5 @@ arabic-reshaper
 python-bidi
 Flask
 Flask-Login
-Authlib
-requests
 gunicorn
 python-dotenv

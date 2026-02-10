@@ -8,7 +8,6 @@ import tempfile
 import json
 from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -25,71 +24,13 @@ if PSYCOPG2_AVAILABLE:
 # Load environment variables
 load_dotenv()
 
-# Allow OAuth over HTTP for local testing
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_session_management' # Change this in production!
-
-# OAuth Configuration
-def load_google_credentials():
-    """Try to load Google credentials from env vars or client_secret.json"""
-    client_id = os.getenv('GOOGLE_CLIENT_ID', 'YOUR_GOOGLE_CLIENT_ID_HERE')
-    client_secret = os.getenv('GOOGLE_CLIENT_SECRET', 'YOUR_GOOGLE_CLIENT_SECRET_HERE')
-    
-    # Check if we have a client_secret.json file
-    json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'client_secret.json')
-    if (client_id.startswith('YOUR_GOOGLE') or client_secret.startswith('YOUR_GOOGLE')) and os.path.exists(json_path):
-        try:
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-                # Handle both "web" and "installed" formats
-                creds = data.get('web') or data.get('installed')
-                if creds:
-                    client_id = creds.get('client_id', client_id)
-                    client_secret = creds.get('client_secret', client_secret)
-                    print("DEBUG: Loaded Google credentials from client_secret.json")
-        except Exception as e:
-            print(f"ERROR: Failed to load client_secret.json: {e}")
-            
-    return client_id, client_secret
-
-GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET = load_google_credentials()
-
-app.config['GOOGLE_CLIENT_ID'] = GOOGLE_CLIENT_ID
-app.config['GOOGLE_CLIENT_SECRET'] = GOOGLE_CLIENT_SECRET
-app.config['GOOGLE_DISCOVERY_URL'] = "https://accounts.google.com/.well-known/openid-configuration"
-
-# Check if we are in Mock/Dev mode
-# Consider it mock if it still has default placeholders
-cid = app.config['GOOGLE_CLIENT_ID']
-MOCK_OAUTH = (
-    cid.startswith('YOUR_GOOGLE') or 
-    cid.startswith('PUT_YOUR') or 
-    'your-project-id' in cid
-)
-
-if MOCK_OAUTH:
-    print(f"WARNING: Google Client ID appears to be a placeholder ({cid[:15]}...). Dev Mode enabled.")
-else:
-    print(f"INFO: Google Client ID loaded ({cid[:10]}...). Standard OAuth enabled.")
 
 # Initialize Login Manager
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'welcome'
-
-# Initialize OAuth
-oauth = OAuth(app)
-google = oauth.register(
-    name='google',
-    client_id=app.config['GOOGLE_CLIENT_ID'],
-    client_secret=app.config['GOOGLE_CLIENT_SECRET'],
-    server_metadata_url=app.config['GOOGLE_DISCOVERY_URL'],
-    client_kwargs={
-        'scope': 'openid email profile'
-    }
-)
 
 # User Class
 class User(UserMixin):
@@ -198,8 +139,6 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id == 'dev_mode_user_id':
-        return User(id='dev_mode_user_id', username='مطور النظام (Dev)', email='dev@gmail.com', role='admin')
     return User.get(user_id)
 
 def get_db_connection():
@@ -233,13 +172,11 @@ def debug_info():
     <p>Host: {request.host}</p>
     <p>Base URL: {request.base_url}</p>
     <p>Remote Addr: {request.remote_addr}</p>
-    <p>Google Client ID: {app.config.get('GOOGLE_CLIENT_ID')[:10]}...</p>
     """
 
 @app.route('/')
 def welcome():
-    # Pass mock status to template
-    return render_template('welcome.html', user=current_user, mock_oauth=MOCK_OAUTH)
+    return render_template('welcome.html', user=current_user)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -259,61 +196,7 @@ def login():
         else:
             flash('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
             
-    return render_template('welcome.html', mock_oauth=MOCK_OAUTH)
-
-@app.route('/login/google')
-def login_google():
-    if MOCK_OAUTH:
-        # Mock login for development/demo when keys are missing
-        # This solves the "invalid_client" error by bypassing Google
-        print("WARNING: Using Mock Login because Google Keys are missing.")
-        
-        # Bypass Database for Dev Mode to avoid locking issues
-        user = User(id='dev_mode_user_id', username='مطور النظام (Dev)', email='dev@gmail.com', role='admin')
-            
-        print(f"DEBUG: Logging in user: {user.username} ({user.id})")
-        login_user(user)
-        return redirect(url_for('dashboard'))
-
-    # Dynamic redirect_uri based on the actual request
-    # This ensures it matches exactly what's in the browser (port 80 or 5000)
-    # url_for('authorize', _external=True) would also work, but manual construction is clearer for debugging
-    scheme = request.scheme
-    host = request.host
-    redirect_uri = f"{scheme}://{host}/authorize"
-
-    print(f"DEBUG: Sending redirect_uri to Google: {redirect_uri}")
-    
-    return google.authorize_redirect(redirect_uri)
-
-@app.route('/authorize')
-def authorize():
-    try:
-        token = google.authorize_access_token()
-        user_info = token.get('userinfo')
-        if not user_info:
-            # Fallback if userinfo not in token
-            resp = google.get('https://www.googleapis.com/oauth2/v3/userinfo')
-            user_info = resp.json()
-            
-        email = user_info.get('email')
-        name = user_info.get('name') or email.split('@')[0]
-        
-        # Check if user exists
-        user = User.get_by_email(email)
-        if not user:
-            # Create new user automatically
-            user = User.create(username=name, email=email)
-        
-        if user:
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        else:
-            return "Failed to create or login user."
-            
-    except Exception as e:
-        traceback.print_exc()
-        return f"Authorization failed: {e}"
+    return render_template('welcome.html')
 
 @app.route('/logout')
 @login_required
