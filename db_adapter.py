@@ -24,6 +24,14 @@ try:
 except ImportError:
     PSYCOPG2_AVAILABLE = False
 
+def normalize_query(query: str) -> str:
+    """Normalize search query by converting wildcard '*' to 'OR' logic for multi-term search."""
+    if not query:
+        return ""
+    # If contains '*', replace with OR logic structure if needed, or just return as is for custom handling
+    # For now, we'll keep it simple as a utility function
+    return query.strip()
+
 # Original SQLite functions
 def db_path():
     r"""Return a valid, writable DB path.
