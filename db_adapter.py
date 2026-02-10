@@ -135,6 +135,7 @@ def connect_db():
     db_file = db_path()
     
     # Initialize DB if missing (for cloud/web environment)
+    # We rely on ensure_db being called explicitly, but for robustness:
     initialize_new = False
     
     # Ensure directory exists (critical for cloud deployment)
@@ -142,7 +143,7 @@ def connect_db():
         db_dir = os.path.dirname(db_file)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
-            print(f"Created database directory: {db_dir}")
+            # print(f"Created database directory: {db_dir}")
     except Exception as e:
         print(f"Error creating database directory: {e}")
 
@@ -152,40 +153,9 @@ def connect_db():
     conn = sqlite3.connect(db_file, timeout=10.0, check_same_thread=False)
     
     if initialize_new:
-        try:
-            # Create basic schema if DB is new
-            # Users table (Updated to include password_hash)
-            conn.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                role TEXT DEFAULT 'user',
-                password_hash TEXT
-            )
-            ''')
-            # Guarantees table
-            conn.execute('''
-            CREATE TABLE IF NOT EXISTS guarantees (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                g_no TEXT UNIQUE,
-                beneficiary TEXT,
-                amount REAL,
-                currency TEXT,
-                start_date TEXT,
-                end_date TEXT,
-                bank TEXT,
-                department TEXT,
-                user_status TEXT,
-                notes TEXT,
-                cash_flag INTEGER DEFAULT 0,
-                type TEXT
-            )
-            ''')
-            conn.commit()
-            print(f"Initialized new database at {db_file}")
-        except Exception as e:
-            print(f"Error initializing database: {e}")
+        # We can call ensure_db() here, but connect_db is called BY ensure_db, so avoid recursion.
+        # We'll let the caller handle schema creation via ensure_db()
+        pass
 
     try:
         conn.execute("PRAGMA busy_timeout=5000")
@@ -197,65 +167,103 @@ def connect_db():
         pass
     return conn
 
-
-def get_db_type():
-    """Get the current database type being used."""
-    if os.environ.get('DATABASE_URL') and PSYCOPG2_AVAILABLE:
-        return "postgres"
-    return "sqlite"
-
-
-def is_centralized_db():
-    """Check if centralized database is being used."""
-    return get_db_type() == "postgres"
-
-
-def get_placeholder():
-    """Return the parameter placeholder for the current DB type."""
-    return "%s" if get_db_type() == "postgres" else "?"
-
-
-def normalize_query(query: str) -> str:
-    """Replace '?' with '%s' if using PostgreSQL."""
-    if get_db_type() == "postgres":
-        return query.replace("?", "%s")
-    return query
-
-
-def execute_query(query: str, params: Optional[tuple] = None, fetch: bool = False):
-    # Execute a database query with automatic connection management.
+def ensure_db():
+    """Ensure all database tables exist and are up-to-date."""
     conn = connect_db()
-    
-    # Normalize query for the active DB connection
-    is_postgres = False
-    if PSYCOPG2_AVAILABLE:
-         is_postgres = isinstance(conn, psycopg2.extensions.connection)
-
-    final_query = query
-    if is_postgres:
-        final_query = query.replace("?", "%s")
-    
     try:
-        if is_postgres:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        else:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-        if params:
-            cursor.execute(final_query, params)
-        else:
-            cursor.execute(final_query)
-            
-        if fetch:
-            result = cursor.fetchall()
-            conn.commit()
-            return result
+        c = conn.cursor()
+        
+        # 1. Guarantees Table
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS guarantees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                department TEXT, bank TEXT, g_no TEXT UNIQUE,
+                g_type TEXT, amount REAL, insurance_amount REAL, percent REAL,
+                beneficiary TEXT, requester TEXT, project_name TEXT,
+                issue_date TEXT, end_date TEXT,
+                user_status TEXT, cash_flag INTEGER DEFAULT 0, attachment TEXT,
+                delivery_status TEXT, recipient_name TEXT, notes TEXT, entry_number TEXT
+            )"""
+        )
+        
+        # 2. Users Table
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT,
+                pass_hash TEXT,
+                role TEXT DEFAULT 'user',
+                active INTEGER DEFAULT 1
+            )"""
+        )
+        
+        # 3. Attachments Table
+        c.execute("""CREATE TABLE IF NOT EXISTS attachments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        g_no TEXT NOT NULL,
+                        path TEXT NOT NULL,
+                        notes TEXT
+                    )""")
+
+        # 4. Loans Table
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS loans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                loan_type TEXT,
+                principal REAL,
+                outstanding REAL,
+                start_date TEXT,
+                end_date TEXT,
+                duration_days INTEGER,
+                rate_percent REAL,
+                cybor_percent REAL,
+                total_percent REAL,
+                period_interest REAL,
+                total_due REAL,
+                sector TEXT
+            )"""
+        )
+        
+        # 5. Bank Limits Table
+        c.execute("""CREATE TABLE IF NOT EXISTS bank_limits (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        bank_name TEXT UNIQUE NOT NULL,
+                        limit_amount REAL DEFAULT 0.0
+                    )""")
+
         conn.commit()
-        return None
-    except Exception:
-        conn.rollback()
-        raise
+        
+        # Run migrations to ensure columns exist (for SQLite)
+        if not (PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)):
+            try:
+                # Guarantees columns
+                cols = [r[1] for r in c.execute("PRAGMA table_info(guarantees)").fetchall()]
+                if "delivery_status" not in cols:
+                    c.execute("ALTER TABLE guarantees ADD COLUMN delivery_status TEXT")
+                if "recipient_name" not in cols:
+                    c.execute("ALTER TABLE guarantees ADD COLUMN recipient_name TEXT")
+                if "notes" not in cols:
+                    c.execute("ALTER TABLE guarantees ADD COLUMN notes TEXT")
+                if "entry_number" not in cols:
+                    c.execute("ALTER TABLE guarantees ADD COLUMN entry_number TEXT")
+                if "attachment" not in cols:
+                    c.execute("ALTER TABLE guarantees ADD COLUMN attachment TEXT")
+                
+                # Attachments columns
+                cols = [r[1] for r in c.execute("PRAGMA table_info(attachments)").fetchall()]
+                if "notes" not in cols:
+                    c.execute("ALTER TABLE attachments ADD COLUMN notes TEXT")
+                    
+                conn.commit()
+            except Exception:
+                pass
+
+        # Use the existing check_and_migrate_db for users table
+        check_and_migrate_db()
+        
+    except Exception as e:
+        print(f"Error in ensure_db: {e}")
     finally:
         try:
             conn.close()
