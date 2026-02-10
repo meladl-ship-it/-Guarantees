@@ -7,7 +7,13 @@ import sqlite3
 import sys
 import os
 from typing import Optional, Union, Any
-from PyQt5 import QtCore
+
+# Try importing PyQt5, but don't fail if it's missing (Web/Headless mode)
+try:
+    from PyQt5 import QtCore
+    QT_AVAILABLE = True
+except ImportError:
+    QT_AVAILABLE = False
 
 # Try importing psycopg2 for PostgreSQL support
 try:
@@ -41,17 +47,32 @@ def db_path():
             return False
 
     base_default = Path.home() / "Documents" / "Guarantees"
+    
+    # If running in a web environment (no Qt or headless), use a local 'data' folder
+    if not QT_AVAILABLE or os.environ.get('RENDER') or os.environ.get('WEBSITE_HOSTNAME'):
+        # Web server mode: use 'data' directory in current project
+        base = Path(__file__).parent / "data"
+        try:
+            base.mkdir(exist_ok=True)
+        except:
+            pass
+        return str(base / "guarantees.db")
+
     try:
-        s = QtCore.QSettings("GuaranteesApp", "Main")
-        custom_dir = s.value("db/dir", type=str)
+        if QT_AVAILABLE:
+            s = QtCore.QSettings("GuaranteesApp", "Main")
+            custom_dir = s.value("db/dir", type=str)
+        else:
+            custom_dir = None
     except Exception:
         custom_dir = None
     base = Path(custom_dir) if (custom_dir or "").strip() else base_default
     if not _is_writable_dir(base):
         base = base_default
         try:
-            s = QtCore.QSettings("GuaranteesApp", "Main")
-            s.setValue("db/dir", str(base))
+            if QT_AVAILABLE:
+                s = QtCore.QSettings("GuaranteesApp", "Main")
+                s.setValue("db/dir", str(base))
         except Exception:
             pass
         try:
