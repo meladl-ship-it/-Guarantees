@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h3 class="mb-0"><i class="fas fa-file-import me-2"></i> استيراد بيانات من Excel</h3>
+                </div>
+                <div class="card-body p-4">
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="alert alert-info border-0 shadow-sm">
+                        <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i> تعليمات الاستيراد:</h5>
+                        <ul class="mb-0 small">
+                            <li>يرجى التأكد من أن ملف Excel يحتوي على الأعمدة التالية بالترتيب أو بنفس الأسماء:</li>
+                            <li><strong>رقم الضمان، المستفيد، المبلغ، العملة، تاريخ الإصدار، تاريخ الانتهاء، البنك، القسم، الحالة، ملاحظات، نقدي/تسهيل، النوع</strong></li>
+                            <li>سيتم تجاهل الصف الأول (العناوين) تلقائياً.</li>
+                            <li>أرقام الضمانات المكررة سيتم تحديث بياناتها أو تجاهلها حسب المنطق المتبع.</li>
+                        </ul>
+                    </div>
+
+                    <form action="{{ url_for('import_excel') }}" method="POST" enctype="multipart/form-data" class="mt-4">
+                        <div class="mb-4">
+                            <label for="file" class="form-label fw-bold">اختر ملف Excel (.xlsx)</label>
+                            <input class="form-control form-control-lg" type="file" id="file" name="file" accept=".xlsx, .xls" required>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-upload me-2"></i> رفع واستيراد البيانات
+                            </button>
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-right me-2"></i> عودة للرئيسية
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
