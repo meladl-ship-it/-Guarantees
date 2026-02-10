@@ -12,6 +12,10 @@
 - معاينة قبل الطباعة تغلق بشكل سليم
 """
 import sys, os, sqlite3, re, subprocess
+try:
+    import requests
+except ImportError:
+    pass
 
 # Fix for Qt platform plugin "windows" not found error
 # Must be set before importing PyQt5 (which happens in reports_handler)
@@ -13353,6 +13357,52 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+    def do_cloud_sync(self):
+        """Execute cloud synchronization"""
+        try:
+            # Check if requests is available
+            if 'requests' not in sys.modules:
+                QtWidgets.QMessageBox.warning(self, "خطأ", "مكتبة requests غير مثبتة. لا يمكن المزامنة.")
+                return
+
+            # Import cloud_sync module dynamically to avoid circular imports or early errors
+            try:
+                import cloud_sync
+            except ImportError:
+                # If file not in path, try adding current dir
+                sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+                try:
+                    import cloud_sync
+                except ImportError as e:
+                    QtWidgets.QMessageBox.warning(self, "خطأ", f"تعذر تحميل وحدة المزامنة: {e}")
+                    return
+
+            # Create progress dialog
+            progress = QtWidgets.QProgressDialog("جاري المزامنة مع السحابة...", "إلغاء", 0, 0, self)
+            progress.setWindowModality(QtCore.Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+            progress.show()
+            
+            # Define callback for progress updates
+            def update_progress(msg):
+                progress.setLabelText(msg)
+                QtWidgets.QApplication.processEvents()
+
+            # Run sync
+            success, msg = cloud_sync.sync_to_cloud(progress_callback=update_progress)
+            
+            progress.close()
+            
+            if success:
+                self.show_toast(msg, 3000)
+                QtWidgets.QMessageBox.information(self, "تم بنجاح", msg)
+            else:
+                QtWidgets.QMessageBox.warning(self, "تنبيه", f"فشلت المزامنة:\n{msg}")
+                
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "خطأ", f"حدث خطأ غير متوقع: {str(e)}")
+
     def _schedule_auto_refresh(self):
         try:
             if getattr(self, '_loading_rows', False):
@@ -20016,6 +20066,18 @@ class SettingsDialog(QtWidgets.QDialog):
             d.addWidget(btn_import)
         except Exception:
             pass
+
+        # --- Cloud Sync Button ---
+        try:
+            btn_sync = QtWidgets.QPushButton("🔄 مزامنة مع السحابة")
+            btn_sync.setToolTip("تحديث البيانات في الموقع السحابي من قاعدة البيانات المحلية")
+            btn_sync.setStyleSheet("QPushButton { padding: 8px; background-color: #0288D1; color: white; font-weight: bold; }")
+            btn_sync.clicked.connect(parent.do_cloud_sync)
+            d.addWidget(btn_sync)
+        except Exception:
+            pass
+        # -------------------------
+
         try:
             btn_export = QtWidgets.QPushButton("تصدير إلى إكسل…")
             if hasattr(parent, "export_excel"):

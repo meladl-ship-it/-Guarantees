@@ -6,8 +6,6 @@ import sqlite3
 import shutil
 import tempfile
 import json
-import openpyxl
-from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
@@ -205,6 +203,82 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('welcome'))
+
+@app.route('/api/sync', methods=['POST'])
+def sync_data():
+    api_key = request.headers.get('X-API-Key')
+    if api_key != os.environ.get('API_KEY'):
+        return json.dumps({'error': 'Unauthorized'}), 401
+
+    data = request.json
+    if not data or 'guarantees' not in data:
+        return json.dumps({'error': 'Invalid data'}), 400
+
+    guarantees_list = data['guarantees']
+    
+    conn = connect_db()
+    try:
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            cursor = conn.cursor()
+            # Delete existing data to ensure full sync
+            cursor.execute("TRUNCATE TABLE guarantees RESTART IDENTITY")
+            
+            # Batch insert
+            columns = [
+                "id", "department", "bank", "g_no", "g_type", "amount", 
+                "insurance_amount", "percent", "beneficiary", "requester", 
+                "project_name", "issue_date", "end_date", "user_status", 
+                "cash_flag", "attachment", "م", "bank_index", "nu", 
+                "entry_no", "delivered", "receiver_name", "notes", 
+                "delivery", "recipient", "delivery_flag", "register_no", 
+                "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
+                "entry_number"
+            ]
+            
+            # Build query
+            cols_str = ", ".join([f'"{c}"' for c in columns]) # Quote columns for safety
+            vals_str = ", ".join(["%s"] * len(columns))
+            query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
+            
+            for g in guarantees_list:
+                # Prepare values tuple, matching columns order
+                # Handle missing keys safely
+                vals = tuple(g.get(c) for c in columns)
+                cursor.execute(query, vals)
+                
+        else:
+            # SQLite
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM guarantees")
+            
+            columns = [
+                "id", "department", "bank", "g_no", "g_type", "amount", 
+                "insurance_amount", "percent", "beneficiary", "requester", 
+                "project_name", "issue_date", "end_date", "user_status", 
+                "cash_flag", "attachment", "م", "bank_index", "nu", 
+                "entry_no", "delivered", "receiver_name", "notes", 
+                "delivery", "recipient", "delivery_flag", "register_no", 
+                "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
+                "entry_number"
+            ]
+            
+            cols_str = ", ".join([f'"{c}"' for c in columns])
+            vals_str = ", ".join(["?"] * len(columns))
+            query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
+            
+            for g in guarantees_list:
+                vals = tuple(g.get(c) for c in columns)
+                cursor.execute(query, vals)
+                
+        conn.commit()
+        return json.dumps({'status': 'success', 'count': len(guarantees_list)}), 200
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Sync Error: {e}")
+        return json.dumps({'error': str(e)}), 500
+    finally:
+        conn.close()
 
 @app.route('/dashboard')
 @login_required
@@ -411,170 +485,6 @@ def index_logic(view_type='dashboard'):
         error_trace = traceback.format_exc()
         print(f"ERROR: {error_trace}")
         return f"<h1>حدث خطأ أثناء الاتصال بقاعدة البيانات:</h1><p>{e}</p><pre>{error_trace}</pre>"
-
-@app.route('/import', methods=['GET', 'POST'])
-@login_required
-def import_excel():
-    # Only admin should import data
-    if current_user.role != 'admin':
-        flash('غير مصرح لك بالقيام بهذا الإجراء', 'danger')
-        return redirect(url_for('dashboard'))
-
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('لم يتم اختيار ملف', 'danger')
-            return redirect(request.url)
-        
-        file = request.files['file']
-        if file.filename == '':
-            flash('لم يتم اختيار ملف', 'danger')
-            return redirect(request.url)
-            
-        if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-            try:
-                # Save file securely
-                filename = secure_filename(file.filename)
-                temp_dir = tempfile.gettempdir()
-                file_path = os.path.join(temp_dir, filename)
-                file.save(file_path)
-                
-                # Process Excel
-                wb = openpyxl.load_workbook(file_path, data_only=True)
-                ws = wb.active
-                
-                headers = {}
-                success_count = 0
-                update_count = 0
-                
-                conn = get_db_connection()
-                
-                # Configure cursor
-                if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
-                    cursor = conn.cursor()
-                else:
-                    cursor = conn.cursor()
-                
-                for i, row in enumerate(ws.iter_rows(values_only=True)):
-                    if i == 0:
-                        # Header mapping
-                        for idx, cell in enumerate(row):
-                            if cell:
-                                headers[str(cell).strip()] = idx
-                        continue
-                        
-                    # Helper to get value by header name or index
-                    def get_val(names, idx_fallback):
-                        val = None
-                        for name in names:
-                            if name in headers:
-                                val = row[headers[name]]
-                                break
-                        if val is None and idx_fallback < len(row):
-                            # Only use fallback if headers were empty or look like data
-                            if not headers or len(headers) < 3: 
-                                val = row[idx_fallback]
-                        return val
-
-                    g_no = get_val(['رقم الضمان', 'Guarantee No', 'g_no'], 0)
-                    if not g_no: continue # Skip empty rows
-                    
-                    data = {}
-                    data['g_no'] = str(g_no).strip()
-                    data['beneficiary'] = str(get_val(['المستفيد', 'Beneficiary'], 1) or '')
-                    
-                    amt = get_val(['المبلغ', 'Amount'], 2)
-                    try:
-                        data['amount'] = float(str(amt).replace(',', '')) if amt else 0.0
-                    except:
-                        data['amount'] = 0.0
-                        
-                    data['currency'] = str(get_val(['العملة', 'Currency'], 3) or 'SAR')
-                    
-                    # Date parsing
-                    def parse_date_val(v):
-                        if not v: return None
-                        if isinstance(v, datetime): return v.strftime('%Y-%m-%d')
-                        # Try string formats
-                        for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%d']:
-                            try:
-                                return datetime.strptime(str(v), fmt).strftime('%Y-%m-%d')
-                            except:
-                                pass
-                        return str(v) # Fallback
-
-                    data['start_date'] = parse_date_val(get_val(['تاريخ الإصدار', 'Start Date'], 4))
-                    data['end_date'] = parse_date_val(get_val(['تاريخ الانتهاء', 'End Date'], 5))
-                    
-                    data['bank'] = str(get_val(['البنك', 'Bank'], 6) or '')
-                    data['department'] = str(get_val(['القسم', 'Department'], 7) or '')
-                    data['user_status'] = str(get_val(['الحالة', 'Status'], 8) or '')
-                    data['notes'] = str(get_val(['ملاحظات', 'Notes'], 9) or '')
-                    
-                    # Cash Flag
-                    cash_val = str(get_val(['نقدي', 'Cash'], 10) or '')
-                    data['cash_flag'] = 1 if 'نعم' in cash_val or '1' in cash_val or 'نقدي' in cash_val else 0
-                    
-                    data['type'] = str(get_val(['النوع', 'Type'], 11) or 'نهائي')
-
-                    # DB Insert/Update
-                    try:
-                        # Check existence
-                        check_sql = normalize_query("SELECT id FROM guarantees WHERE g_no = ?")
-                        cursor.execute(check_sql, (data['g_no'],))
-                        existing = cursor.fetchone()
-                        
-                        if existing:
-                            # Update
-                            sql = normalize_query('''
-                                UPDATE guarantees SET 
-                                beneficiary=?, amount=?, currency=?, start_date=?, end_date=?, 
-                                bank=?, department=?, user_status=?, notes=?, cash_flag=?, type=?
-                                WHERE g_no=?
-                            ''')
-                            params = (
-                                data['beneficiary'], data['amount'], data['currency'], 
-                                data['start_date'], data['end_date'], data['bank'], 
-                                data['department'], data['user_status'], data['notes'], 
-                                data['cash_flag'], data['type'], data['g_no']
-                            )
-                            cursor.execute(sql, params)
-                            update_count += 1
-                        else:
-                            # Insert
-                            sql = normalize_query('''
-                                INSERT INTO guarantees (
-                                    g_no, beneficiary, amount, currency, start_date, end_date, 
-                                    bank, department, user_status, notes, cash_flag, type
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            ''')
-                            params = (
-                                data['g_no'], data['beneficiary'], data['amount'], data['currency'], 
-                                data['start_date'], data['end_date'], data['bank'], 
-                                data['department'], data['user_status'], data['notes'], 
-                                data['cash_flag'], data['type']
-                            )
-                            cursor.execute(sql, params)
-                            success_count += 1
-                            
-                    except Exception as e:
-                        print(f"Error processing row {i}: {e}")
-                        continue
-                        
-                conn.commit()
-                conn.close()
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
-                
-                flash(f'تمت العملية بنجاح! تم إضافة {success_count} ضمان وتحديث {update_count} ضمان.', 'success')
-                return redirect(url_for('dashboard'))
-                
-            except Exception as e:
-                flash(f'حدث خطأ أثناء معالجة الملف: {e}', 'danger')
-                return redirect(request.url)
-                
-    return render_template('import.html')
 
 if __name__ == '__main__':
     print("جاري تشغيل الموقع...")
