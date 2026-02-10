@@ -214,64 +214,105 @@ def sync_data():
     if not data or 'guarantees' not in data:
         return json.dumps({'error': 'Invalid data'}), 400
 
-    guarantees_list = data['guarantees']
+    guarantees_list = data.get('guarantees', [])
+    users_list = data.get('users', [])
     
     conn = connect_db()
     try:
         if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
             cursor = conn.cursor()
-            # Delete existing data to ensure full sync
-            cursor.execute("TRUNCATE TABLE guarantees RESTART IDENTITY")
             
-            # Batch insert
-            columns = [
-                "id", "department", "bank", "g_no", "g_type", "amount", 
-                "insurance_amount", "percent", "beneficiary", "requester", 
-                "project_name", "issue_date", "end_date", "user_status", 
-                "cash_flag", "attachment", "م", "bank_index", "nu", 
-                "entry_no", "delivered", "receiver_name", "notes", 
-                "delivery", "recipient", "delivery_flag", "register_no", 
-                "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
-                "entry_number"
-            ]
-            
-            # Build query
-            cols_str = ", ".join([f'"{c}"' for c in columns]) # Quote columns for safety
-            vals_str = ", ".join(["%s"] * len(columns))
-            query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
-            
-            for g in guarantees_list:
-                # Prepare values tuple, matching columns order
-                # Handle missing keys safely
-                vals = tuple(g.get(c) for c in columns)
-                cursor.execute(query, vals)
+            # --- Sync Guarantees ---
+            if guarantees_list:
+                # Delete existing data to ensure full sync
+                cursor.execute("TRUNCATE TABLE guarantees RESTART IDENTITY")
                 
+                # Batch insert
+                columns = [
+                    "id", "department", "bank", "g_no", "g_type", "amount", 
+                    "insurance_amount", "percent", "beneficiary", "requester", 
+                    "project_name", "issue_date", "end_date", "user_status", 
+                    "cash_flag", "attachment", "م", "bank_index", "nu", 
+                    "entry_no", "delivered", "receiver_name", "notes", 
+                    "delivery", "recipient", "delivery_flag", "register_no", 
+                    "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
+                    "entry_number"
+                ]
+                
+                # Build query
+                cols_str = ", ".join([f'"{c}"' for c in columns]) # Quote columns for safety
+                vals_str = ", ".join(["%s"] * len(columns))
+                query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
+                
+                for g in guarantees_list:
+                    # Prepare values tuple, matching columns order
+                    # Handle missing keys safely
+                    vals = tuple(g.get(c) for c in columns)
+                    cursor.execute(query, vals)
+            
+            # --- Sync Users ---
+            if users_list:
+                # Truncate users table (careful: this logs out everyone if session depends on DB state, but usually session is cookie based)
+                cursor.execute("TRUNCATE TABLE users RESTART IDENTITY")
+                
+                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active"]
+                # Filter columns that exist in the target schema if needed, but we assume schema parity via db_adapter
+                
+                cols_str = ", ".join([f'"{c}"' for c in user_columns])
+                vals_str = ", ".join(["%s"] * len(user_columns))
+                query = f"INSERT INTO users ({cols_str}) VALUES ({vals_str})"
+                
+                for u in users_list:
+                    # Clean user data: ensure required fields like username exist
+                    if not u.get('username'): continue
+                    
+                    vals = tuple(u.get(c) for c in user_columns)
+                    cursor.execute(query, vals)
+
         else:
             # SQLite
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM guarantees")
             
-            columns = [
-                "id", "department", "bank", "g_no", "g_type", "amount", 
-                "insurance_amount", "percent", "beneficiary", "requester", 
-                "project_name", "issue_date", "end_date", "user_status", 
-                "cash_flag", "attachment", "م", "bank_index", "nu", 
-                "entry_no", "delivered", "receiver_name", "notes", 
-                "delivery", "recipient", "delivery_flag", "register_no", 
-                "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
-                "entry_number"
-            ]
+            # --- Sync Guarantees ---
+            if guarantees_list:
+                cursor.execute("DELETE FROM guarantees")
+                
+                columns = [
+                    "id", "department", "bank", "g_no", "g_type", "amount", 
+                    "insurance_amount", "percent", "beneficiary", "requester", 
+                    "project_name", "issue_date", "end_date", "user_status", 
+                    "cash_flag", "attachment", "م", "bank_index", "nu", 
+                    "entry_no", "delivered", "receiver_name", "notes", 
+                    "delivery", "recipient", "delivery_flag", "register_no", 
+                    "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
+                    "entry_number"
+                ]
+                
+                cols_str = ", ".join([f'"{c}"' for c in columns])
+                vals_str = ", ".join(["?"] * len(columns))
+                query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
+                
+                for g in guarantees_list:
+                    vals = tuple(g.get(c) for c in columns)
+                    cursor.execute(query, vals)
             
-            cols_str = ", ".join([f'"{c}"' for c in columns])
-            vals_str = ", ".join(["?"] * len(columns))
-            query = f"INSERT INTO guarantees ({cols_str}) VALUES ({vals_str})"
-            
-            for g in guarantees_list:
-                vals = tuple(g.get(c) for c in columns)
-                cursor.execute(query, vals)
+            # --- Sync Users ---
+            if users_list:
+                cursor.execute("DELETE FROM users")
+                
+                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active"]
+                
+                cols_str = ", ".join([f'"{c}"' for c in user_columns])
+                vals_str = ", ".join(["?"] * len(user_columns))
+                query = f"INSERT INTO users ({cols_str}) VALUES ({vals_str})"
+                
+                for u in users_list:
+                    if not u.get('username'): continue
+                    vals = tuple(u.get(c) for c in user_columns)
+                    cursor.execute(query, vals)
                 
         conn.commit()
-        return json.dumps({'status': 'success', 'count': len(guarantees_list)}), 200
+        return json.dumps({'status': 'success', 'count_guarantees': len(guarantees_list), 'count_users': len(users_list)}), 200
         
     except Exception as e:
         conn.rollback()

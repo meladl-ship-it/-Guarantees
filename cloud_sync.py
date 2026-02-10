@@ -58,10 +58,30 @@ def sync_to_cloud(progress_callback=None):
             
         conn.close()
         
-        if progress_callback:
-            progress_callback(f"تم قراءة {len(data)} ضمان. جاري الرفع للسحابة...")
+        # === Fetch Users ===
+        conn = connect_db()
+        try:
+            conn.row_factory = sqlite3.Row
+        except:
+            pass
             
-        payload = {"guarantees": data}
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users")
+        user_rows = cursor.fetchall()
+        
+        if user_rows and isinstance(user_rows[0], sqlite3.Row):
+            users_data = [dict(row) for row in user_rows]
+        elif user_rows:
+            cols = [c[0] for c in cursor.description]
+            users_data = [dict(zip(cols, row)) for row in user_rows]
+        else:
+            users_data = []
+        conn.close()
+        
+        if progress_callback:
+            progress_callback(f"تم قراءة {len(data)} ضمان و {len(users_data)} مستخدم. جاري الرفع للسحابة...")
+            
+        payload = {"guarantees": data, "users": users_data}
         headers = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
         
         # Use a longer timeout for large data
