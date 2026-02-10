@@ -13,9 +13,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # Ensure we can import db_adapter from current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE, check_and_migrate_db
+from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE, check_and_migrate_db, ensure_db
 
 # Ensure DB schema is up to date (add password column if missing)
+# For cloud apps, we must ensure tables exist first
+ensure_db()
 check_and_migrate_db()
 
 if PSYCOPG2_AVAILABLE:

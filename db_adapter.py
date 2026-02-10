@@ -181,10 +181,18 @@ def ensure_db():
     try:
         c = conn.cursor()
         
+        is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+        
+        # Define types based on DB
+        if is_postgres:
+            pk_type = "SERIAL PRIMARY KEY"
+        else:
+            pk_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+            
         # 1. Guarantees Table
         c.execute(
-            """CREATE TABLE IF NOT EXISTS guarantees (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            f"""CREATE TABLE IF NOT EXISTS guarantees (
+                id {pk_type},
                 department TEXT, bank TEXT, g_no TEXT UNIQUE,
                 g_type TEXT, amount REAL, insurance_amount REAL, percent REAL,
                 beneficiary TEXT, requester TEXT, project_name TEXT,
@@ -196,8 +204,8 @@ def ensure_db():
         
         # 2. Users Table
         c.execute(
-            """CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            f"""CREATE TABLE IF NOT EXISTS users (
+                id {pk_type},
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT,
                 pass_hash TEXT,
@@ -207,8 +215,8 @@ def ensure_db():
         )
         
         # 3. Attachments Table
-        c.execute("""CREATE TABLE IF NOT EXISTS attachments (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        c.execute(f"""CREATE TABLE IF NOT EXISTS attachments (
+                        id {pk_type},
                         g_no TEXT NOT NULL,
                         path TEXT NOT NULL,
                         notes TEXT
@@ -216,8 +224,8 @@ def ensure_db():
 
         # 4. Loans Table
         c.execute(
-            """CREATE TABLE IF NOT EXISTS loans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            f"""CREATE TABLE IF NOT EXISTS loans (
+                id {pk_type},
                 loan_type TEXT,
                 principal REAL,
                 outstanding REAL,
@@ -234,8 +242,8 @@ def ensure_db():
         )
         
         # 5. Bank Limits Table
-        c.execute("""CREATE TABLE IF NOT EXISTS bank_limits (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        c.execute(f"""CREATE TABLE IF NOT EXISTS bank_limits (
+                        id {pk_type},
                         bank_name TEXT UNIQUE NOT NULL,
                         limit_amount REAL DEFAULT 0.0
                     )""")
@@ -243,7 +251,7 @@ def ensure_db():
         conn.commit()
         
         # Run migrations to ensure columns exist (for SQLite)
-        if not (PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)):
+        if not is_postgres:
             try:
                 # Guarantees columns
                 cols = [r[1] for r in c.execute("PRAGMA table_info(guarantees)").fetchall()]
