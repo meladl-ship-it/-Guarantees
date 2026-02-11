@@ -377,22 +377,63 @@ def debug_info():
 
 @app.route('/test-email')
 def test_email_route():
+    results = []
     try:
-        # Use the admin email or a fallback
+        # 1. Test using Flask-Mail
+        results.append("<h3>Attempt 1: Flask-Mail</h3>")
         email = 'm.eladl@abs-haj.com'
-        msg = Message("Test Email - Debug", recipients=[email])
-        msg.body = f"""
-        Success!
-        Email configuration is working.
-        Server: {app.config.get('MAIL_SERVER')}
-        Port: {app.config.get('MAIL_PORT')}
-        User: {app.config.get('MAIL_USERNAME')}
-        """
-        mail.send(msg)
-        return f"<h1>Email Sent Successfully!</h1><p>Check inbox for {email}</p>"
+        msg = Message("Test Email - Flask-Mail", recipients=[email])
+        msg.body = "Test from Flask-Mail"
+        try:
+            mail.send(msg)
+            results.append("<p style='color:green'>Flask-Mail: Success</p>")
+        except Exception as e:
+            results.append(f"<p style='color:red'>Flask-Mail Failed: {e}</p>")
+            import traceback
+            results.append(f"<pre>{traceback.format_exc()}</pre>")
+
+        # 2. Test using Raw SMTP (Standard Library) to debug connection
+        results.append("<h3>Attempt 2: Raw SMTP (smtplib)</h3>")
+        import smtplib
+        from email.mime.text import MIMEText
+        
+        smtp_server = app.config.get('MAIL_SERVER')
+        smtp_port = app.config.get('MAIL_PORT')
+        smtp_user = app.config.get('MAIL_USERNAME')
+        smtp_pass = app.config.get('MAIL_PASSWORD')
+        
+        results.append(f"<p>Config: {smtp_server}:{smtp_port} (SSL={app.config.get('MAIL_USE_SSL')})</p>")
+        
+        try:
+            if app.config.get('MAIL_USE_SSL'):
+                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
+            else:
+                server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+                if app.config.get('MAIL_USE_TLS'):
+                    server.starttls()
+            
+            # Login
+            results.append("<p>Connecting...</p>")
+            server.login(smtp_user, smtp_pass)
+            results.append("<p>Logged in!</p>")
+            
+            # Send
+            msg_raw = MIMEText("Test from Raw SMTP")
+            msg_raw['Subject'] = "Test Email - Raw SMTP"
+            msg_raw['From'] = smtp_user
+            msg_raw['To'] = email
+            
+            server.sendmail(smtp_user, [email], msg_raw.as_string())
+            server.quit()
+            results.append("<p style='color:green'>Raw SMTP: Success</p>")
+        except Exception as e:
+            results.append(f"<p style='color:red'>Raw SMTP Failed: {e}</p>")
+            import traceback
+            results.append(f"<pre>{traceback.format_exc()}</pre>")
+
+        return "".join(results)
     except Exception as e:
-        import traceback
-        return f"<h1>Email Failed</h1><pre>{traceback.format_exc()}</pre>"
+        return f"<h1>Critical Error</h1><p>{e}</p>"
 
 @app.route('/')
 def welcome():
@@ -444,14 +485,23 @@ def forgot_password():
             try:
                 # Debug info
                 print(f"Attempting to send email to: {target_email}")
-                print(f"SMTP Config: Server={app.config['MAIL_SERVER']}, Port={app.config['MAIL_PORT']}, TLS={app.config['MAIL_USE_TLS']}, User={app.config['MAIL_USERNAME']}")
+                print(f"SMTP Config: Server={app.config['MAIL_SERVER']}, Port={app.config['MAIL_PORT']}, SSL={app.config.get('MAIL_USE_SSL')}, User={app.config['MAIL_USERNAME']}")
                 
                 # Generate Token
                 token = serializer.dumps(target_email, salt='password-reset-salt')
                 reset_url = url_for('reset_password', token=token, _external=True)
                 
+                # --- CRITICAL FALLBACK: PRINT LINK TO LOGS ---
+                print("\n" + "="*50)
+                print(f"PASSWORD RESET LINK FOR {target_email}:")
+                print(reset_url)
+                print("="*50 + "\n")
+                # ---------------------------------------------
+                
                 # Send Email
-                msg = Message("إعادة تعيين كلمة المرور - نظام الضمانات", recipients=[target_email])
+                msg = Message("إعادة تعيين كلمة المرور - نظام الضمانات", 
+                              sender=('نظام الضمانات', app.config['MAIL_USERNAME']),
+                              recipients=[target_email])
                 msg.body = f"""
                 مرحباً {target_username}،
                 
