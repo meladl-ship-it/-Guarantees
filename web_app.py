@@ -11,17 +11,12 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 try:
-    from flask_mail import Mail, Message
+    # Removed Flask-Mail as per user request
+    pass
 except ImportError:
-    # Fallback: stub the classes so the file still imports
-    class Mail:
-        def __init__(self, app=None): pass
-        def init_app(self, app): pass
-    class Message:
-        def __init__(self, subject='', recipients=None, body=''): pass
-from itsdangerous import URLSafeTimedSerializer
+    pass
 
-from threading import Thread
+from itsdangerous import URLSafeTimedSerializer
 
 # Load environment variables FIRST
 load_dotenv()
@@ -71,34 +66,9 @@ else:
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_session_management' # Change this in production!
 
-# Configure Mail
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
-app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'false').lower() in ['true', 'on', '1']
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
-app.config['MAIL_TIMEOUT'] = 30  # Timeout in seconds to prevent hanging
+# Mail Configuration REMOVED
 
-# If Port is 465, force SSL and disable TLS
-if app.config['MAIL_PORT'] == 465:
-    app.config['MAIL_USE_SSL'] = True
-    app.config['MAIL_USE_TLS'] = False
-
-mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
-
-def send_async_email(app, msg):
-    with app.app_context():
-        try:
-            print(f">>> SYSTEM: Sending email to {msg.recipients}...")
-            mail.send(msg)
-            print(">>> SYSTEM: Email sent successfully!")
-        except Exception as e:
-            print(f">>> SYSTEM ERROR: Failed to send email: {e}")
-            import traceback
-            traceback.print_exc()
 
 # Initialize Login Manager
 login_manager = LoginManager()
@@ -377,63 +347,8 @@ def debug_info():
 
 @app.route('/test-email')
 def test_email_route():
-    results = []
-    try:
-        # 1. Test using Flask-Mail
-        results.append("<h3>Attempt 1: Flask-Mail</h3>")
-        email = 'm.eladl@abs-haj.com'
-        msg = Message("Test Email - Flask-Mail", recipients=[email])
-        msg.body = "Test from Flask-Mail"
-        try:
-            mail.send(msg)
-            results.append("<p style='color:green'>Flask-Mail: Success</p>")
-        except Exception as e:
-            results.append(f"<p style='color:red'>Flask-Mail Failed: {e}</p>")
-            import traceback
-            results.append(f"<pre>{traceback.format_exc()}</pre>")
-
-        # 2. Test using Raw SMTP (Standard Library) to debug connection
-        results.append("<h3>Attempt 2: Raw SMTP (smtplib)</h3>")
-        import smtplib
-        from email.mime.text import MIMEText
-        
-        smtp_server = app.config.get('MAIL_SERVER')
-        smtp_port = app.config.get('MAIL_PORT')
-        smtp_user = app.config.get('MAIL_USERNAME')
-        smtp_pass = app.config.get('MAIL_PASSWORD')
-        
-        results.append(f"<p>Config: {smtp_server}:{smtp_port} (SSL={app.config.get('MAIL_USE_SSL')})</p>")
-        
-        try:
-            if app.config.get('MAIL_USE_SSL'):
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30)
-            else:
-                server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-                if app.config.get('MAIL_USE_TLS'):
-                    server.starttls()
-            
-            # Login
-            results.append("<p>Connecting...</p>")
-            server.login(smtp_user, smtp_pass)
-            results.append("<p>Logged in!</p>")
-            
-            # Send
-            msg_raw = MIMEText("Test from Raw SMTP")
-            msg_raw['Subject'] = "Test Email - Raw SMTP"
-            msg_raw['From'] = smtp_user
-            msg_raw['To'] = email
-            
-            server.sendmail(smtp_user, [email], msg_raw.as_string())
-            server.quit()
-            results.append("<p style='color:green'>Raw SMTP: Success</p>")
-        except Exception as e:
-            results.append(f"<p style='color:red'>Raw SMTP Failed: {e}</p>")
-            import traceback
-            results.append(f"<pre>{traceback.format_exc()}</pre>")
-
-        return "".join(results)
-    except Exception as e:
-        return f"<h1>Critical Error</h1><p>{e}</p>"
+    # REMOVED PER USER REQUEST
+    return "Email functionality has been disabled."
 
 @app.route('/')
 def welcome():
@@ -590,6 +505,7 @@ def reset_password(token):
             return render_template('reset_password.html')
             
         # Try to find user by email first
+        # Note: 'email' variable here comes from serializer.loads() above
         user_data = User.get_by_email(email)
         
         # If email was a placeholder (e.g. admin@system.local), try to extract username
