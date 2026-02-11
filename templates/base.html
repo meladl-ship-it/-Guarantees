@@ -102,30 +102,57 @@
 
         /* Top Header Styling */
         .top-header {
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             padding: 0.8rem 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
             position: sticky;
-            top: 0;
+            top: 1rem; /* Floating from top */
             z-index: 1030;
-            margin-right: 280px; /* Space for sidebar */
-            transition: margin-right 0.3s ease;
-        }
-        
-        .top-header.expanded {
-            margin-right: 0; /* No space when sidebar is collapsed */
+            margin: 0 1rem 1rem 1rem; /* Floating margins */
+            border-radius: 12px;
         }
         
         .toggle-btn {
-            background: none;
-            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
             color: #1e3c72;
-            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
             cursor: pointer;
-            padding: 5px;
+        }
+        
+        .toggle-btn:hover {
+            background-color: #1e3c72;
+            color: #fff;
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .header-user-btn {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #495057;
+            transition: all 0.2s;
+        }
+        
+        .header-user-btn:hover, .header-user-btn.show {
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            color: #1e3c72;
         }
         
         /* Main Content Styling */
@@ -257,13 +284,19 @@
                     <i class="fas fa-calendar-alt ms-1"></i> {{ today_date }}
                 </span>
                 <div class="dropdown">
-                    <button class="btn btn-light rounded-circle" type="button" data-bs-toggle="dropdown">
-                        <i class="fas fa-user"></i>
+                    <button class="btn header-user-btn" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user-circle fa-lg"></i>
+                        <span class="d-none d-md-inline">{{ current_user.username }}</span>
+                        <i class="fas fa-chevron-down small ms-1"></i>
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><span class="dropdown-item-text text-muted">{{ current_user.username }}</span></li>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
+                        <li><span class="dropdown-item-text text-muted small">تسجيل الدخول كـ {{ current_user.role }}</span></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">خروج</a></li>
+                        <li>
+                            <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt ms-2"></i>تسجيل الخروج
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -288,7 +321,6 @@
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const mainWrapper = document.getElementById('mainWrapper');
-            const topHeader = document.getElementById('topHeader');
             const overlay = document.getElementById('sidebarOverlay');
             
             // Check if mobile
@@ -298,7 +330,6 @@
             } else {
                 sidebar.classList.toggle('collapsed');
                 mainWrapper.classList.toggle('expanded');
-                topHeader.classList.toggle('expanded');
             }
         }
     </script>
