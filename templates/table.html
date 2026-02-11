@@ -57,7 +57,30 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive" style="max-height: 75vh;">
-                <table class="table table-hover table-striped align-middle mb-0 text-nowrap" id="guaranteesTable" style="font-size: 0.9rem;">
+                <style>
+                    .table th, .table td {
+                        text-align: center !important;
+                        vertical-align: middle !important;
+                    }
+                    .table th {
+                        position: relative;
+                        cursor: col-resize;
+                        user-select: none;
+                    }
+                    .resizer {
+                        position: absolute;
+                        top: 0;
+                        right: 0;
+                        width: 5px;
+                        cursor: col-resize;
+                        user-select: none;
+                        height: 100%;
+                    }
+                    .resizer:hover, .resizing {
+                        border-right: 2px solid #0d6efd;
+                    }
+                </style>
+                <table class="table table-hover table-striped align-middle mb-0" id="guaranteesTable" style="font-size: 0.9rem;">
                     <thead class="table-light sticky-top" style="z-index: 1;">
                         <tr>
                             <th>#</th>
@@ -496,5 +519,44 @@
             downloadLink.click();
         }
     }
+    // Column Resizing Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const table = document.getElementById('guaranteesTable');
+        const headers = table.querySelectorAll('th');
+        
+        headers.forEach(header => {
+            const resizer = document.createElement('div');
+            resizer.classList.add('resizer');
+            header.appendChild(resizer);
+            
+            let x = 0;
+            let w = 0;
+            
+            const mouseDownHandler = function(e) {
+                x = e.clientX;
+                const styles = window.getComputedStyle(header);
+                w = parseInt(styles.width, 10);
+                
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+                resizer.classList.add('resizing');
+            };
+            
+            const mouseMoveHandler = function(e) {
+                const dx = x - e.clientX; // RTL: drag left increases width
+                header.style.width = `${w + dx}px`;
+                header.style.minWidth = `${w + dx}px`; // Force min-width
+            };
+            
+            const mouseUpHandler = function() {
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+                resizer.classList.remove('resizing');
+            };
+            
+            resizer.addEventListener('mousedown', mouseDownHandler);
+        });
+    });
+
 </script>
 {% endblock %}
