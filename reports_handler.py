@@ -3,7 +3,7 @@ import os
 import sys
 from datetime import date
 # PyQt5 imports moved to inside methods to avoid dependency in web app
-from db_adapter import connect_db
+from db_adapter import connect_db, PSYCOPG2_AVAILABLE
 from logger import log_error, log_info
 
 class ReportsHandler:
@@ -31,11 +31,22 @@ class ReportsHandler:
             c = conn.cursor()
             
             # Fetch guarantees for this department
-            c.execute("""
+            query = """
                 SELECT bank, g_type, g_no, amount, beneficiary, project_name, end_date, user_status, cash_flag 
                 FROM guarantees 
                 WHERE department = ?
-            """, (dept_name,))
+            """
+            
+            # Adjust query for Postgres if needed
+            if PSYCOPG2_AVAILABLE:
+                try:
+                    import psycopg2.extensions
+                    if isinstance(conn, psycopg2.extensions.connection):
+                        query = query.replace('?', '%s')
+                except ImportError:
+                    pass
+            
+            c.execute(query, (dept_name,))
             rows = c.fetchall()
             conn.close()
 
