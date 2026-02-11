@@ -57,7 +57,7 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive" style="max-height: 75vh;">
-                <table class="table table-hover table-striped align-middle mb-0" id="guaranteesTable" style="font-size: 0.9rem;">
+                <table class="table table-hover table-striped align-middle mb-0 text-nowrap" id="guaranteesTable" style="font-size: 0.9rem;">
                     <thead class="table-light sticky-top" style="z-index: 1;">
                         <tr>
                             <th>رقم الضمان</th>
@@ -88,13 +88,13 @@
                             <td class="font-monospace fw-bold">{{ "{:,.2f}".format(g.amount) if g.amount else '0.00' }}</td>
                             <td class="font-monospace">{{ "{:,.2f}".format(g.insurance_amount) if g.insurance_amount else '0.00' }}</td>
                             <td class="font-monospace">{{ "{:,.2f}".format(g.percent) if g.percent else '0.00' }}%</td>
-                            <td class="text-truncate" style="max-width: 150px;" title="{{ g.beneficiary }}">{{ g.beneficiary }}</td>
-                            <td class="text-truncate" style="max-width: 150px;" title="{{ g.project_name }}">{{ g.project_name }}</td>
-                            <td class="text-truncate" style="max-width: 100px;" title="{{ g.requester }}">{{ g.requester }}</td>
+                            <td>{{ g.beneficiary }}</td>
+                            <td>{{ g.project_name }}</td>
+                            <td>{{ g.requester }}</td>
                             <td>{{ g.issue_date }}</td>
                             <td>{{ g.end_date }}</td>
                             <td>{{ g.department }}</td>
-                            <td class="text-truncate" style="max-width: 100px;" title="{{ g.notes }}">{{ g.notes }}</td>
+                            <td>{{ g.notes }}</td>
                             <td>{{ g.entry_number }}</td>
                             <td>
                                 {% if g.display_status == 'ساري' %}

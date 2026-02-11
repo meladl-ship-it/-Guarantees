@@ -1087,8 +1087,10 @@ def index_logic(view_type='dashboard'):
         net_total_amount = sum(r['amount'] for r in active_rows if r['amount'] is not None)
         
         if view_type == 'table':
+            # تصفية الضمانات النقدية من العرض في الجدول (cash_flag = 1)
+            table_rows = [r for r in processed_rows if r.get('cash_flag') != 1]
             return render_template('table.html', 
-                                 guarantees=processed_rows, 
+                                 guarantees=table_rows, 
                                  today_date=today_str)
 
         # === منطق لوحة الإحصائيات ===
