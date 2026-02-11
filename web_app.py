@@ -13,6 +13,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 
+from threading import Thread
+
 # Load environment variables FIRST
 load_dotenv()
 
@@ -65,12 +67,30 @@ app.secret_key = 'super_secret_key_for_session_management' # Change this in prod
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'false').lower() in ['true', 'on', '1']
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+app.config['MAIL_TIMEOUT'] = 30  # Timeout in seconds to prevent hanging
+
+# If Port is 465, force SSL and disable TLS
+if app.config['MAIL_PORT'] == 465:
+    app.config['MAIL_USE_SSL'] = True
+    app.config['MAIL_USE_TLS'] = False
 
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
+
+def send_async_email(app, msg):
+    with app.app_context():
+        try:
+            print(f">>> SYSTEM: Sending email to {msg.recipients}...")
+            mail.send(msg)
+            print(">>> SYSTEM: Email sent successfully!")
+        except Exception as e:
+            print(f">>> SYSTEM ERROR: Failed to send email: {e}")
+            import traceback
+            traceback.print_exc()
 
 # Initialize Login Manager
 login_manager = LoginManager()
@@ -415,14 +435,17 @@ def forgot_password():
                 الرابط صالح لمدة ساعة واحدة.
                 إذا لم تقم بهذا الطلب، يمكنك تجاهل هذه الرسالة.
                 """
-                mail.send(msg)
-                flash('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.', 'success')
+                
+                # Send asynchronously to prevent hanging
+                Thread(target=send_async_email, args=(app, msg)).start()
+                
+                flash('تم استلام طلبك. إذا كانت البيانات صحيحة، ستصلك رسالة عبر البريد الإلكتروني خلال لحظات.', 'success')
             except Exception as e:
-                print(f"Mail Error: {e}")
+                print(f"Mail Preparation Error: {e}")
                 import traceback
                 traceback.print_exc()
                 # Show actual error to user for debugging
-                flash(f'فشل الإرسال: {str(e)}', 'danger')
+                flash(f'حدث خطأ أثناء تحضير الإرسال: {str(e)}', 'danger')
         else:
             # Debugging: tell user why it failed
             if not target_user:
