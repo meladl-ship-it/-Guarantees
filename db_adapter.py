@@ -104,6 +104,13 @@ def check_and_migrate_db():
                 cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
                 conn.commit()
                 print("Migrated: Added password_hash to users table (Postgres)")
+
+            # Check if email column exists
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='email'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
+                conn.commit()
+                print("Migrated: Added email to users table (Postgres)")
         else:
             # SQLite
             cursor = conn.cursor()
@@ -113,6 +120,11 @@ def check_and_migrate_db():
                 cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
                 conn.commit()
                 print("Migrated: Added password_hash to users table (SQLite)")
+            
+            if 'email' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
+                conn.commit()
+                print("Migrated: Added email to users table (SQLite)")
                 
     except Exception as e:
         print(f"Migration error: {e}")
