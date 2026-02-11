@@ -253,6 +253,12 @@
                     <span>سجل الضمانات</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'bank_limits' %}active{% endif %}" href="{{ url_for('bank_limits') }}">
+                    <i class="fas fa-university"></i>
+                    <span>حدود البنوك</span>
+                </a>
+            </li>
             {% if current_user.role == 'admin' %}
             <li class="nav-item">
                 <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">

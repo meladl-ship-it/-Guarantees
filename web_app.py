@@ -584,6 +584,188 @@ def dashboard():
 def data_table():
     return index_logic(view_type='table')
 
+# --- Bank Limits Logic ---
+ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+
+def normalize_gno(g_no):
+    n = (g_no or "").strip().upper()
+    n = n.translate(ARABIC_DIGITS)
+    n = n.replace(" ", "").replace("-", "").replace("/", "")
+    return n
+
+def detect_bank_from_gno(g_no):
+    n = normalize_gno(g_no)
+    raw = (g_no or "").strip().upper().translate(ARABIC_DIGITS)
+    
+    if n == "B299015":
+        return "الأهلي مطارات الرياض"
+        
+    markers = ["ATNHTS", "APNHTS", "APNGCU", "ATNGCU", "AFGGCU", "GST", "AFGWPM", "APNWPM", "ATNCBG", "APNCBG", "GIC"]
+    if any(m and (m in n) for m in markers):
+        return "ساب"
+        
+    if "OGTE" in n:
+        return "الراجحي"
+        
+    if ("JLG" in n) or ("RLG" in n):
+        return "الرياض"
+        
+    if "MD" in n:
+        return "الإنماء"
+        
+    try:
+        if ("B" in raw) or ("M" in raw):
+            return "الأهلي"
+    except:
+        pass
+        
+    return ""
+
+def normalize_bank(b, g_no):
+    b = (b or "").strip()
+    
+    if normalize_gno(g_no) == "B299015":
+        return "الأهلي مطارات الرياض"
+        
+    if "مطارات الرياض" in b or "الأهلي مطارات الرياض" in b or "الاهلي مطارات الرياض" in b:
+        return "الأهلي مطارات الرياض"
+    if any(x in b for x in ("الاهلي", "الأهلي", "الاهلي ")):
+        return "الأهلي"
+    if "ساب" in b:
+        return "ساب"
+    if "الراجحي" in b:
+        return "الراجحي"
+    if "الرياض" in b:
+        return "الرياض"
+    if "الإنماء" in b or "الانماء" in b:
+        return "الإنماء"
+        
+    auto = detect_bank_from_gno(g_no)
+    if auto:
+        return auto
+        
+    return b or ""
+
+@app.route('/bank-limits')
+@login_required
+def bank_limits():
+    try:
+        conn = get_db_connection()
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        else:
+            conn.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            cursor = conn.cursor()
+            
+        # Fetch guarantees
+        cursor.execute("SELECT * FROM guarantees")
+        rows = cursor.fetchall()
+        
+        # Fetch limits
+        limits_data = {}
+        try:
+            # Ensure table exists (for SQLite locally it might be created by desktop app, for Postgres we might need to check)
+            # We'll just try to select.
+            cursor.execute("SELECT bank_name, limit_amount FROM bank_limits")
+            for row in cursor.fetchall():
+                # Handle dictionary access depending on row factory
+                if isinstance(row, dict):
+                    limits_data[row['bank_name']] = float(row['limit_amount'] or 0.0)
+                else:
+                    # Fallback if something weird happens with factory (e.g. SQLite Row)
+                    limits_data[row[0]] = float(row[1] or 0.0)
+        except Exception as e:
+            print(f"Note: bank_limits table might not exist or empty: {e}")
+            
+        conn.close()
+        
+        # Process data
+        bank_data = {}
+        today = datetime.now()
+        today = datetime(today.year, today.month, today.day)
+        
+        allowed_statuses = ("ساري", "قارب على الانتهاء", "انتهى في انتظار التأكيد", "ضمان غير مسجل")
+        
+        for r in rows:
+            raw_status = (r.get('user_status') or '').strip()
+            # Exclude cash
+            is_cash = (r.get('cash_flag') == 1)
+            if is_cash: continue
+            
+            # Determine effective status
+            display_status = raw_status
+            if display_status == '' or display_status == 'ساري':
+                display_status = 'ساري'
+                end_date_str = r.get('end_date')
+                if end_date_str:
+                    try:
+                        end_date = datetime.strptime(str(end_date_str), '%Y-%m-%d')
+                        days_left = (end_date - today).days
+                        if 0 <= days_left <= 30:
+                            display_status = 'قارب على الانتهاء'
+                        elif days_left < 0:
+                            display_status = 'انتهى في انتظار التأكيد'
+                    except:
+                        pass
+            
+            if display_status not in allowed_statuses:
+                continue
+                
+            # Normalize bank
+            bname = normalize_bank(r.get('bank'), r.get('g_no'))
+            if not bname: continue
+            
+            if bname not in bank_data:
+                bank_data[bname] = {"existing": 0.0, "unregistered": 0.0}
+                
+            try:
+                amt = float(r.get('amount') or 0.0)
+            except:
+                amt = 0.0
+                
+            if display_status == 'ضمان غير مسجل':
+                bank_data[bname]["unregistered"] += amt
+            else:
+                bank_data[bname]["existing"] += amt
+                
+        # Prepare table data
+        table_data = []
+        # Include banks from limits even if they have no guarantees? 
+        # guarantees.py doesn't, but it might be better UI. 
+        # Let's union keys.
+        all_banks = set(bank_data.keys()) | set(limits_data.keys())
+        
+        for bank_name in sorted(all_banks):
+            if bank_name not in bank_data:
+                data = {"existing": 0.0, "unregistered": 0.0}
+            else:
+                data = bank_data[bank_name]
+                
+            limit = limits_data.get(bank_name, 0.0)
+            existing = data["existing"]
+            unregistered = data["unregistered"]
+            total = existing + unregistered
+            remaining = max(0.0, limit - total)
+            usage_pct = (total / limit * 100.0) if limit > 0 else 0.0
+            
+            table_data.append({
+                "bank": bank_name,
+                "limit": limit,
+                "existing": existing,
+                "unregistered": unregistered,
+                "total": total,
+                "remaining": remaining,
+                "usage_pct": usage_pct
+            })
+            
+        return render_template('bank_limits.html', data=table_data, today_date=today.strftime('%Y-%m-%d'))
+        
+    except Exception as e:
+        print(f"Error in bank_limits: {e}")
+        traceback.print_exc()
+        flash('حدث خطأ أثناء جلب بيانات حدود البنوك', 'danger')
+        return redirect(url_for('dashboard'))
+
 def index_logic(view_type='dashboard'):
     try:
         # Note: db_path check is only valid for local SQLite. 
