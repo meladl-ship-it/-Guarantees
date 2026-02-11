@@ -241,6 +241,9 @@ def logout():
 def debug_users():
     # TEMPORARY DEBUG ROUTE
     try:
+        import werkzeug
+        from werkzeug.security import check_password_hash
+        
         conn = get_db_connection()
         if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
             cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -252,11 +255,19 @@ def debug_users():
         rows = cursor.fetchall()
         conn.close()
         
-        html = "<h1>Debug Users</h1><ul>"
+        html = f"<h1>Debug Users (Werkzeug {werkzeug.__version__})</h1><ul>"
         for r in rows:
             u = dict(r)
             h = u.get('password_hash', '')
-            html += f"<li>User: {u.get('username')} | Role: {u.get('role')} | Hash: {h[:20]}... (Len: {len(h) if h else 0})</li>"
+            # Test hash for admin
+            is_valid = "N/A"
+            if u.get('username') == 'admin':
+                try:
+                    is_valid = check_password_hash(h, 'admin')
+                except Exception as e:
+                    is_valid = f"Error: {e}"
+            
+            html += f"<li>User: {u.get('username')} | Role: {u.get('role')} | Hash: {h[:20]}...{h[-10:] if h and len(h)>20 else ''} (Len: {len(h) if h else 0}) | Valid('admin'): {is_valid}</li>"
         html += "</ul>"
         return html
     except Exception as e:
