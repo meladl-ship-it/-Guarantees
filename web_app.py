@@ -450,6 +450,7 @@ def sync_data():
 
     guarantees_list = data.get('guarantees', [])
     users_list = data.get('users', [])
+    bank_limits_list = data.get('bank_limits', [])
     
     print(f"DEBUG SYNC: Received {len(users_list)} users.")
     for u in users_list:
@@ -524,6 +525,27 @@ def sync_data():
                     
                     vals = tuple(u.get(c) for c in user_columns)
                     cursor.execute(query, vals)
+            
+            # --- Sync Bank Limits ---
+            if bank_limits_list:
+                # Create table if not exists (for Postgres, though db_adapter should handle it, we want to be safe)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS bank_limits (
+                        id SERIAL PRIMARY KEY,
+                        bank_name TEXT NOT NULL UNIQUE,
+                        limit_amount REAL DEFAULT 0.0
+                    )
+                """)
+                cursor.execute("TRUNCATE TABLE bank_limits RESTART IDENTITY")
+                
+                bl_columns = ["bank_name", "limit_amount"]
+                cols_str = ", ".join([f'"{c}"' for c in bl_columns])
+                vals_str = ", ".join(["%s"] * len(bl_columns))
+                query = f"INSERT INTO bank_limits ({cols_str}) VALUES ({vals_str})"
+                
+                for bl in bank_limits_list:
+                    vals = tuple(bl.get(c) for c in bl_columns)
+                    cursor.execute(query, vals)
 
         else:
             # SQLite
@@ -563,9 +585,35 @@ def sync_data():
                     if not u.get('username'): continue
                     vals = tuple(u.get(c) for c in user_columns)
                     cursor.execute(query, vals)
+                    
+            # --- Sync Bank Limits ---
+            if bank_limits_list:
+                # Ensure table exists
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS bank_limits (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        bank_name TEXT UNIQUE,
+                        limit_amount REAL DEFAULT 0.0
+                    )
+                """)
+                cursor.execute("DELETE FROM bank_limits")
+                
+                bl_columns = ["bank_name", "limit_amount"]
+                cols_str = ", ".join([f'"{c}"' for c in bl_columns])
+                vals_str = ", ".join(["?"] * len(bl_columns))
+                query = f"INSERT INTO bank_limits ({cols_str}) VALUES ({vals_str})"
+                
+                for bl in bank_limits_list:
+                    vals = tuple(bl.get(c) for c in bl_columns)
+                    cursor.execute(query, vals)
                 
         conn.commit()
-        return json.dumps({'status': 'success', 'count_guarantees': len(guarantees_list), 'count_users': len(users_list)}), 200
+        return json.dumps({
+            'status': 'success', 
+            'count_guarantees': len(guarantees_list), 
+            'count_users': len(users_list),
+            'count_bank_limits': len(bank_limits_list)
+        }), 200
         
     except Exception as e:
         conn.rollback()
