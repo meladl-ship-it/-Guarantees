@@ -251,6 +251,19 @@ def sync_data():
                     "notes", "entry_number"
                 ]
                 
+                # Check data integrity (handle ID casing or missing ID)
+                if guarantees_list:
+                    sample = guarantees_list[0]
+                    # Fix ID casing if needed
+                    if 'id' not in sample and 'ID' in sample:
+                        for g in guarantees_list:
+                            g['id'] = g.pop('ID')
+                    
+                    # If ID is still missing or None, remove from columns to allow auto-increment
+                    if 'id' not in sample or sample.get('id') is None:
+                        if 'id' in columns:
+                            columns.remove('id')
+                
                 # Build query
                 cols_str = ", ".join([f'"{c}"' for c in columns]) # Quote columns for safety
                 vals_str = ", ".join(["%s"] * len(columns))
