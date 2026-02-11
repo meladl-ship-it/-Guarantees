@@ -7,6 +7,7 @@ subst Z: /d >nul 2>&1
 subst Z: "%~dp0."
 if errorlevel 1 (
     echo Failed to map virtual drive.
+    pause
     exit /b 1
 )
 
@@ -16,17 +17,33 @@ REM Clean previous builds
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
-REM Run PyInstaller using the venv python
-REM Assuming .venv exists in the project root
-.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm Guarantees.spec
+REM Determine Python executable
+if exist ".venv\Scripts\python.exe" (
+    echo Using venv Python...
+    set PYTHON_EXE=.venv\Scripts\python.exe
+) else (
+    echo Using system Python...
+    set PYTHON_EXE=python
+)
+
+REM Run PyInstaller
+"%PYTHON_EXE%" -m PyInstaller --clean --noconfirm Guarantees.spec
 
 if errorlevel 1 (
-    echo Build failed!
+    echo.
+    echo ==============================
+    echo       BUILD FAILED!
+    echo ==============================
     popd
     subst Z: /d
+    pause
     exit /b 1
 )
 
-echo Build successful!
+echo.
+echo ==============================
+echo       BUILD SUCCESSFUL!
+echo ==============================
 popd
 subst Z: /d
+pause
