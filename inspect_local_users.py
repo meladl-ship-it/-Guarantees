@@ -19,26 +19,20 @@ def inspect_users():
         
     cursor = conn.cursor()
 
-    try:
-        # Get columns
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [row[1] for row in cursor.fetchall()] # row[1] is name in pragma output
-        print(f"User Table Columns: {columns}")
+    cursor.execute("PRAGMA table_info(users)")
+    columns = cursor.fetchall()
+    print("\nColumns:")
+    for col in columns:
+        print(col)
 
-        # Get sample data
-        cursor.execute("SELECT * FROM users")
-        rows = cursor.fetchall()
-        print(f"Total Users: {len(rows)}")
-        for row in rows:
-            if isinstance(row, sqlite3.Row):
-                print(f"User: {dict(row)}")
-            else:
-                # Tuple fallback
-                print(f"User (tuple): {row}")
-                
-    except Exception as e:
-        print(f"Error inspecting DB: {e}")
-
+    print("\nUsers Data:")
+    cursor.execute("SELECT id, username, password_hash, role FROM users")
+    users = cursor.fetchall()
+    for user in users:
+        print(f"ID: {user[0]}, User: {user[1]}, Role: {user[3]}")
+        print(f"Hash: {user[2]}")
+        print("-" * 50)
+    
     conn.close()
 
 if __name__ == "__main__":

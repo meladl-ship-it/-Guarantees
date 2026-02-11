@@ -84,7 +84,12 @@ def sync_to_cloud(progress_callback=None):
         else:
             users_data = []
         conn.close()
-        
+
+        print(f"\n[DEBUG] Found {len(users_data)} users locally:")
+        for u in users_data:
+            h = u.get('password_hash', '')
+            print(f" - User: {u.get('username')}, Role: {u.get('role')}, Hash Prefix: {h[:20]}...")
+
         if progress_callback:
             progress_callback(f"تم قراءة {len(data)} ضمان و {len(users_data)} مستخدم. جاري الرفع للسحابة...")
             

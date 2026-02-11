@@ -189,7 +189,8 @@ class UsersManager(QtWidgets.QMainWindow):
                 
             try:
                 cursor = self.get_db_cursor()
-                pwd_hash = generate_password_hash(data['password'])
+                # Use pbkdf2:sha256 for better compatibility and shorter length
+                pwd_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
                 
                 # Check if exists
                 cursor.execute("SELECT id FROM users WHERE username = ?", (data['username'],))
@@ -241,7 +242,8 @@ class UsersManager(QtWidgets.QMainWindow):
                         return
 
                 if data['password']:
-                    pwd_hash = generate_password_hash(data['password'])
+                    # Use pbkdf2:sha256 for better compatibility and shorter length
+                    pwd_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
                     cursor.execute(
                         "UPDATE users SET email=?, role=?, password_hash=? WHERE id=?",
                         (data['email'], data['role'], pwd_hash, user_id)

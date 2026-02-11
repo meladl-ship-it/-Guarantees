@@ -237,6 +237,31 @@ def logout():
     logout_user()
     return redirect(url_for('welcome'))
 
+@app.route('/debug/users')
+def debug_users():
+    # TEMPORARY DEBUG ROUTE
+    try:
+        conn = get_db_connection()
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        else:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        html = "<h1>Debug Users</h1><ul>"
+        for r in rows:
+            u = dict(r)
+            h = u.get('password_hash', '')
+            html += f"<li>User: {u.get('username')} | Role: {u.get('role')} | Hash: {h[:20]}... (Len: {len(h) if h else 0})</li>"
+        html += "</ul>"
+        return html
+    except Exception as e:
+        return f"Error: {e}"
+
 @app.route('/api/sync', methods=['POST'])
 def sync_data():
     # Ensure DB exists and is migrated before processing sync
@@ -258,6 +283,11 @@ def sync_data():
 
     guarantees_list = data.get('guarantees', [])
     users_list = data.get('users', [])
+    
+    print(f"DEBUG SYNC: Received {len(users_list)} users.")
+    for u in users_list:
+        h = u.get('password_hash', '')
+        print(f" - Sync User: {u.get('username')} HashPrefix: {h[:20]}...")
     
     conn = connect_db()
     try:
