@@ -247,11 +247,8 @@ def sync_data():
                     "id", "department", "bank", "g_no", "g_type", "amount", 
                     "insurance_amount", "percent", "beneficiary", "requester", 
                     "project_name", "issue_date", "end_date", "user_status", 
-                    "cash_flag", "attachment", "م", "bank_index", "nu", 
-                    "entry_no", "delivered", "receiver_name", "notes", 
-                    "delivery", "recipient", "delivery_flag", "register_no", 
-                    "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
-                    "entry_number"
+                    "cash_flag", "attachment", "delivery_status", "recipient_name", 
+                    "notes", "entry_number"
                 ]
                 
                 # Build query
@@ -296,11 +293,8 @@ def sync_data():
                     "id", "department", "bank", "g_no", "g_type", "amount", 
                     "insurance_amount", "percent", "beneficiary", "requester", 
                     "project_name", "issue_date", "end_date", "user_status", 
-                    "cash_flag", "attachment", "م", "bank_index", "nu", 
-                    "entry_no", "delivered", "receiver_name", "notes", 
-                    "delivery", "recipient", "delivery_flag", "register_no", 
-                    "recipient_name", "delivered_flag", "reg_no", "delivery_status", 
-                    "entry_number"
+                    "cash_flag", "attachment", "delivery_status", "recipient_name", 
+                    "notes", "entry_number"
                 ]
                 
                 cols_str = ", ".join([f'"{c}"' for c in columns])
