@@ -175,22 +175,22 @@
 
 <!-- Add Modal -->
 <div class="modal fade" id="addModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">إضافة ضمان جديد</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-bold">إضافة ضمان جديد</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ url_for('add_guarantee') }}" method="POST">
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">رقم الضمان <span class="text-danger">*</span></label>
-                            <input type="text" name="g_no" class="form-control" required>
+                <div class="modal-body py-2">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">رقم الضمان <span class="text-danger">*</span></label>
+                            <input type="text" name="g_no" class="form-control form-control-sm" required>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">البنك</label>
-                            <select name="bank" class="form-select">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">البنك</label>
+                            <select name="bank" class="form-select form-select-sm">
                                 <option value="الراجحي">الراجحي</option>
                                 <option value="الأهلي">الأهلي</option>
                                 <option value="الرياض">الرياض</option>
@@ -198,71 +198,77 @@
                                 <option value="الإنماء">الإنماء</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">نوع الضمان</label>
-                            <select name="g_type" class="form-select">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">النوع</label>
+                            <select name="g_type" class="form-select form-select-sm">
                                 <option value="ابتدائي">ابتدائي</option>
                                 <option value="نهائي">نهائي</option>
                                 <option value="دفعة مقدمة">دفعة مقدمة</option>
                                 <option value="مالي">مالي</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">المبلغ</label>
-                            <input type="number" step="0.01" name="amount" class="form-control">
+                        
+                        <div class="col-4">
+                            <label class="form-label small mb-0">المبلغ</label>
+                            <input type="number" step="0.01" name="amount" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">الغطاء (مبلغ التأمين)</label>
-                            <input type="number" step="0.01" name="insurance_amount" class="form-control">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">الغطاء</label>
+                            <input type="number" step="0.01" name="insurance_amount" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">النسبة %</label>
-                            <input type="number" step="0.01" name="percent" class="form-control">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">النسبة %</label>
+                            <input type="number" step="0.01" name="percent" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label">المستفيد</label>
-                            <input type="text" name="beneficiary" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">المستفيد</label>
+                            <input type="text" name="beneficiary" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">اسم المشروع</label>
-                            <input type="text" name="project_name" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">المشروع</label>
+                            <input type="text" name="project_name" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">طالب الضمان</label>
-                            <input type="text" name="requester" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">طالب الضمان</label>
+                            <input type="text" name="requester" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">تاريخ الإصدار</label>
-                            <input type="date" name="issue_date" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">القسم</label>
+                            <input type="text" name="department" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">تاريخ الانتهاء</label>
-                            <input type="date" name="end_date" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الإصدار</label>
+                            <input type="date" name="issue_date" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">القسم</label>
-                            <input type="text" name="department" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الانتهاء</label>
+                            <input type="date" name="end_date" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">رقم القيد</label>
-                            <input type="text" name="entry_number" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">رقم القيد</label>
+                            <input type="text" name="entry_number" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label">ملاحظات</label>
-                            <textarea name="notes" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">الحالة</label>
-                            <select name="user_status" class="form-select">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الحالة</label>
+                            <select name="user_status" class="form-select form-select-sm">
                                 <option value="ساري" selected>ساري</option>
                                 <option value="منتهي">منتهي</option>
                             </select>
                         </div>
+
+                        <div class="col-12">
+                            <label class="form-label small mb-0">ملاحظات</label>
+                            <textarea name="notes" class="form-control form-control-sm" rows="1"></textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">حفظ</button>
+                <div class="modal-footer py-1">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">حفظ</button>
                 </div>
             </form>
         </div>
@@ -271,22 +277,22 @@
 
 <!-- Edit Modal -->
 <div class="modal fade" id="editModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">تعديل ضمان</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header py-2">
+                <h6 class="modal-title fw-bold">تعديل ضمان</h6>
+                <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
             </div>
             <form id="editForm" method="POST">
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">رقم الضمان</label>
-                            <input type="text" name="g_no" id="edit_g_no" class="form-control" required>
+                <div class="modal-body py-2">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">رقم الضمان</label>
+                            <input type="text" name="g_no" id="edit_g_no" class="form-control form-control-sm" required>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">البنك</label>
-                            <select name="bank" id="edit_bank" class="form-select">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">البنك</label>
+                            <select name="bank" id="edit_bank" class="form-select form-select-sm">
                                 <option value="الراجحي">الراجحي</option>
                                 <option value="الأهلي">الأهلي</option>
                                 <option value="الرياض">الرياض</option>
@@ -294,71 +300,77 @@
                                 <option value="الإنماء">الإنماء</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">نوع الضمان</label>
-                            <select name="g_type" id="edit_g_type" class="form-select">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">النوع</label>
+                            <select name="g_type" id="edit_g_type" class="form-select form-select-sm">
                                 <option value="ابتدائي">ابتدائي</option>
                                 <option value="نهائي">نهائي</option>
                                 <option value="دفعة مقدمة">دفعة مقدمة</option>
                                 <option value="مالي">مالي</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">المبلغ</label>
-                            <input type="number" step="0.01" name="amount" id="edit_amount" class="form-control">
+                        
+                        <div class="col-4">
+                            <label class="form-label small mb-0">المبلغ</label>
+                            <input type="number" step="0.01" name="amount" id="edit_amount" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">الغطاء</label>
-                            <input type="number" step="0.01" name="insurance_amount" id="edit_insurance" class="form-control">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">الغطاء</label>
+                            <input type="number" step="0.01" name="insurance_amount" id="edit_insurance" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">النسبة %</label>
-                            <input type="number" step="0.01" name="percent" id="edit_percent" class="form-control">
+                        <div class="col-4">
+                            <label class="form-label small mb-0">النسبة %</label>
+                            <input type="number" step="0.01" name="percent" id="edit_percent" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label">المستفيد</label>
-                            <input type="text" name="beneficiary" id="edit_beneficiary" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">المستفيد</label>
+                            <input type="text" name="beneficiary" id="edit_beneficiary" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">اسم المشروع</label>
-                            <input type="text" name="project_name" id="edit_project" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">المشروع</label>
+                            <input type="text" name="project_name" id="edit_project" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">طالب الضمان</label>
-                            <input type="text" name="requester" id="edit_requester" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">طالب الضمان</label>
+                            <input type="text" name="requester" id="edit_requester" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">تاريخ الإصدار</label>
-                            <input type="date" name="issue_date" id="edit_issue_date" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">القسم</label>
+                            <input type="text" name="department" id="edit_dept" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">تاريخ الانتهاء</label>
-                            <input type="date" name="end_date" id="edit_end_date" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الإصدار</label>
+                            <input type="date" name="issue_date" id="edit_issue_date" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">القسم</label>
-                            <input type="text" name="department" id="edit_dept" class="form-control">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الانتهاء</label>
+                            <input type="date" name="end_date" id="edit_end_date" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">رقم القيد</label>
-                            <input type="text" name="entry_number" id="edit_entry" class="form-control">
+
+                        <div class="col-6">
+                            <label class="form-label small mb-0">رقم القيد</label>
+                            <input type="text" name="entry_number" id="edit_entry" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-12">
-                            <label class="form-label">ملاحظات</label>
-                            <textarea name="notes" id="edit_notes" class="form-control" rows="2"></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">الحالة</label>
-                            <select name="user_status" id="edit_status" class="form-select">
+                        <div class="col-6">
+                            <label class="form-label small mb-0">الحالة</label>
+                            <select name="user_status" id="edit_status" class="form-select form-select-sm">
                                 <option value="ساري">ساري</option>
                                 <option value="منتهي">منتهي</option>
                             </select>
                         </div>
+
+                        <div class="col-12">
+                            <label class="form-label small mb-0">ملاحظات</label>
+                            <textarea name="notes" id="edit_notes" class="form-control form-control-sm" rows="1"></textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                <div class="modal-footer py-1">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary btn-sm">حفظ التغييرات</button>
                 </div>
             </form>
         </div>
