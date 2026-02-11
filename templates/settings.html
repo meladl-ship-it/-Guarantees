@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        background-color: #fff;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    
+    .section-title {
+        color: #1e3c72;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #f0f2f5;
+        padding-bottom: 10px;
+    }
+    
+    .user-card {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: all 0.3s;
+        background: #fff;
+    }
+    
+    .user-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        transform: translateY(-2px);
+    }
+    
+    .role-badge {
+        font-size: 0.8rem;
+        padding: 5px 12px;
+        border-radius: 20px;
+    }
+    
+    .badge-admin {
+        background-color: #e3f2fd;
+        color: #1565c0;
+    }
+    
+    .badge-user {
+        background-color: #f5f5f5;
+        color: #616161;
+    }
+    
+    .action-btn {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 5px;
+        transition: all 0.2s;
+    }
+    
+    .btn-edit {
+        background-color: #fff3e0;
+        color: #ef6c00;
+    }
+    
+    .btn-delete {
+        background-color: #ffebee;
+        color: #c62828;
+    }
+    
+    .btn-edit:hover {
+        background-color: #ffe0b2;
+    }
+    
+    .btn-delete:hover {
+        background-color: #ffcdd2;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+    }
+    
+    .modal-title {
+        font-weight: 600;
+    }
+    
+    .btn-close-white {
+        filter: invert(1) grayscale(100%) brightness(200%);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="settings-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="section-title mb-0">
+                <i class="fas fa-users-cog ms-2"></i> إدارة المستخدمين
+            </h2>
+            <button class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fas fa-plus ms-2"></i> مستخدم جديد
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>اسم المستخدم</th>
+                        <th>البريد الإلكتروني</th>
+                        <th>الصلاحية</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded-circle p-2 ms-3 text-secondary">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <strong>{{ user.username }}</strong>
+                            </div>
+                        </td>
+                        <td>{{ user.email or '-' }}</td>
+                        <td>
+                            <span class="role-badge {{ 'badge-admin' if user.role == 'admin' else 'badge-user' }}">
+                                {{ 'مسؤول النظام' if user.role == 'admin' else 'مستخدم عادي' }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn action-btn btn-edit" title="تعديل" 
+                                    onclick="openEditModal('{{ user.id }}', '{{ user.username }}', '{{ user.email or '' }}', '{{ user.role }}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            
+                            {% if user.id != current_user.id %}
+                            <button class="btn action-btn btn-delete" title="حذف" 
+                                    onclick="confirmDelete('{{ user.id }}', '{{ user.username }}')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة مستخدم جديد</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_user') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المستخدم</label>
+                        <input type="text" class="form-control" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">البريد الإلكتروني</label>
+                        <input type="email" class="form-control" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">كلمة المرور</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="password" id="newPass" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePass('newPass')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الصلاحية</label>
+                        <select class="form-select" name="role">
+                            <option value="user">مستخدم عادي</option>
+                            <option value="admin">مسؤول النظام</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تعديل بيانات المستخدم</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المستخدم</label>
+                        <input type="text" class="form-control" name="username" id="editUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">البريد الإلكتروني</label>
+                        <input type="email" class="form-control" name="email" id="editEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">كلمة المرور الجديدة (اتركه فارغاً للإبقاء على القديمة)</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="password" id="editPass">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePass('editPass')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">الصلاحية</label>
+                        <select class="form-select" name="role" id="editRole">
+                            <option value="user">مستخدم عادي</option>
+                            <option value="admin">مسؤول النظام</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete User Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">تأكيد الحذف</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="deleteForm" method="POST">
+                <div class="modal-body">
+                    <p>هل أنت متأكد من رغبتك في حذف المستخدم <strong id="deleteUsername"></strong>؟</p>
+                    <p class="text-danger small">لا يمكن التراجع عن هذا الإجراء.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">حذف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePass(id) {
+        const input = document.getElementById(id);
+        const icon = input.nextElementSibling.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function openEditModal(id, username, email, role) {
+        document.getElementById('editUsername').value = username;
+        document.getElementById('editEmail').value = email;
+        document.getElementById('editRole').value = role;
+        document.getElementById('editForm').action = "{{ url_for('edit_user', user_id='0') }}".replace('0', id);
+        
+        new bootstrap.Modal(document.getElementById('editUserModal')).show();
+    }
+
+    function confirmDelete(id, username) {
+        document.getElementById('deleteUsername').textContent = username;
+        document.getElementById('deleteForm').action = "{{ url_for('delete_user', user_id='0') }}".replace('0', id);
+        
+        new bootstrap.Modal(document.getElementById('deleteUserModal')).show();
+    }
+</script>
+{% endblock %}

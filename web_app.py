@@ -162,6 +162,97 @@ class User(UserMixin):
             print(f"Error creating user: {e}")
         return None
 
+    @staticmethod
+    def update(user_id, username=None, email=None, role=None, password=None):
+        try:
+            conn = get_db_connection()
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+            updates = []
+            params = []
+            
+            if username:
+                updates.append("username = ?")
+                params.append(username)
+            if email:
+                updates.append("email = ?")
+                params.append(email)
+            if role:
+                updates.append("role = ?")
+                params.append(role)
+            if password:
+                updates.append("password_hash = ?")
+                params.append(generate_password_hash(password))
+            
+            if not updates:
+                return False
+                
+            params.append(user_id)
+            sql = normalize_query(f"UPDATE users SET {', '.join(updates)} WHERE id = ?")
+            
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+                
+            cursor.execute(sql, tuple(params))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error updating user: {e}")
+            return False
+
+    @staticmethod
+    def delete(user_id):
+        try:
+            conn = get_db_connection()
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+            sql = normalize_query("DELETE FROM users WHERE id = ?")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+                
+            cursor.execute(sql, (user_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error deleting user: {e}")
+            return False
+
+    @staticmethod
+    def get_all():
+        try:
+            conn = get_db_connection()
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
+                cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            else:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+            cursor.execute("SELECT * FROM users ORDER BY username")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            users = []
+            for row in rows:
+                u = dict(row)
+                users.append(User(id=u['id'], username=u['username'], email=u.get('email'), role=u.get('role', 'user')))
+            return users
+        except Exception as e:
+            print(f"Error fetching all users: {e}")
+            return []
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)
@@ -688,6 +779,84 @@ def index_logic(view_type='dashboard'):
         error_trace = traceback.format_exc()
         print(f"ERROR: {error_trace}")
         return f"<h1>حدث خطأ أثناء الاتصال بقاعدة البيانات:</h1><p>{e}</p><pre>{error_trace}</pre>"
+
+@app.route('/settings')
+@login_required
+def settings():
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بالوصول لهذه الصفحة', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    users = User.get_all()
+    return render_template('settings.html', users=users)
+
+@app.route('/settings/users/add', methods=['POST'])
+@login_required
+def add_user():
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بهذا الإجراء', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    username = request.form.get('username')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    role = request.form.get('role', 'user')
+    
+    if not username or not password:
+        flash('اسم المستخدم وكلمة المرور مطلوبان', 'warning')
+        return redirect(url_for('settings'))
+        
+    if User.get_by_username(username):
+        flash('اسم المستخدم موجود بالفعل', 'warning')
+        return redirect(url_for('settings'))
+        
+    if User.create(username, email, role, password):
+        flash('تم إضافة المستخدم بنجاح', 'success')
+    else:
+        flash('حدث خطأ أثناء إضافة المستخدم', 'danger')
+        
+    return redirect(url_for('settings'))
+
+@app.route('/settings/users/edit/<user_id>', methods=['POST'])
+@login_required
+def edit_user(user_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بهذا الإجراء', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    username = request.form.get('username')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    role = request.form.get('role')
+    
+    if not username:
+        flash('اسم المستخدم مطلوب', 'warning')
+        return redirect(url_for('settings'))
+        
+    if User.update(user_id, username, email, role, password if password else None):
+        flash('تم تحديث بيانات المستخدم بنجاح', 'success')
+    else:
+        flash('حدث خطأ أثناء تحديث المستخدم', 'danger')
+        
+    return redirect(url_for('settings'))
+
+@app.route('/settings/users/delete/<user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بهذا الإجراء', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    if user_id == current_user.id:
+        flash('لا يمكنك حذف حسابك الحالي', 'warning')
+        return redirect(url_for('settings'))
+        
+    if User.delete(user_id):
+        flash('تم حذف المستخدم بنجاح', 'success')
+    else:
+        flash('حدث خطأ أثناء حذف المستخدم', 'danger')
+        
+    return redirect(url_for('settings'))
 
 if __name__ == '__main__':
     print("جاري تشغيل الموقع...")
