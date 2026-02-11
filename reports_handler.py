@@ -2,7 +2,7 @@
 import os
 import sys
 from datetime import date
-from PyQt5 import QtWidgets, QtCore
+# PyQt5 imports moved to inside methods to avoid dependency in web app
 from db_adapter import connect_db
 from logger import log_error, log_info
 
@@ -331,6 +331,7 @@ class ReportsHandler:
     @staticmethod
     def generate_dept_letter_ui(parent, dept_name):
         try:
+            from PyQt5 import QtWidgets, QtCore
             # 1. Select File Location
             today_str = date.today().strftime("%Y-%m-%d")
             clean_dept = str(dept_name).replace("/", "-").replace("\\", "-")
@@ -364,6 +365,7 @@ class ReportsHandler:
     @staticmethod
     def generate_all_dept_letters_ui(parent):
         try:
+            from PyQt5 import QtWidgets, QtCore
             # 1. Select Directory
             dir_path = QtWidgets.QFileDialog.getExistingDirectory(parent, "اختر مجلد لحفظ التقارير")
             if not dir_path:

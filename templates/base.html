@@ -259,6 +259,12 @@
                     <span>حدود البنوك</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}">
+                    <i class="fas fa-file-word"></i>
+                    <span>تقارير الأقسام</span>
+                </a>
+            </li>
             {% if current_user.role == 'admin' %}
             <li class="nav-item">
                 <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">

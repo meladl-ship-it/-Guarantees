@@ -1,6 +1,7 @@
-from flask import Flask, render_template, url_for, redirect, session, flash, request
+from flask import Flask, render_template, url_for, redirect, session, flash, request, send_file
 import sys
 import os
+import io
 import traceback
 import sqlite3
 import shutil
@@ -24,6 +25,7 @@ load_dotenv()
 # Ensure we can import db_adapter from current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE, check_and_migrate_db, ensure_db
+from reports_handler import ReportsHandler
 
 # Import psycopg2 if available to avoid NameErrors
 if PSYCOPG2_AVAILABLE:
@@ -1284,6 +1286,65 @@ def approve_user(user_id):
         flash('حدث خطأ أثناء تفعيل المستخدم', 'danger')
         
     return redirect(url_for('settings'))
+
+@app.route('/reports')
+@login_required
+def reports():
+    try:
+        conn = get_db_connection()
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        else:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+        # Get distinct departments that have active guarantees
+        cursor.execute("SELECT DISTINCT department FROM guarantees WHERE department IS NOT NULL AND department != ''")
+        rows = cursor.fetchall()
+        
+        depts = []
+        for r in rows:
+            d = r['department'] if isinstance(r, dict) else r[0]
+            if d:
+                depts.append(d)
+        
+        depts.sort()
+        conn.close()
+        
+        return render_template('reports.html', departments=depts)
+    except Exception as e:
+        print(f"Error fetching departments: {e}")
+        flash('حدث خطأ أثناء جلب الأقسام', 'danger')
+        return redirect(url_for('dashboard'))
+
+@app.route('/reports/download/<path:dept_name>')
+@login_required
+def download_report(dept_name):
+    try:
+        # Generate report to memory
+        output = io.BytesIO()
+        
+        success = ReportsHandler.generate_word_for_dept(dept_name, output)
+        
+        if success:
+            output.seek(0)
+            safe_dept = dept_name.replace('/', '-').replace('\\', '-')
+            filename = f"Report_{safe_dept}_{datetime.now().strftime('%Y-%m-%d')}.docx"
+            
+            return send_file(
+                output,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+        else:
+            flash(f'لا توجد بيانات للقسم: {dept_name}', 'warning')
+            return redirect(url_for('reports'))
+            
+    except Exception as e:
+        print(f"Error generating report: {e}")
+        flash(f'حدث خطأ أثناء إنشاء التقرير: {e}', 'danger')
+        return redirect(url_for('reports'))
 
 if __name__ == '__main__':
     print("جاري تشغيل الموقع...")
