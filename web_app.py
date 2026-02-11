@@ -199,6 +199,9 @@ def check_legacy_hash(stored_hash, password):
         pass
     return False
 
+# Global debug log for login attempts (InMemory)
+login_attempts_log = []
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -208,16 +211,47 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
+        # Debug logging
+        try:
+            import datetime
+            log_entry = {
+                'time': str(datetime.datetime.now()),
+                'username_input': f"'{username}'",
+                'password_len': len(password) if password else 0,
+                'password_preview': password[:2] + '***' if password else 'None',
+            }
+        except:
+            log_entry = {'error': 'logging_failed'}
+
         user_data = User.get_by_username(username)
+        log_entry['user_found'] = bool(user_data)
         
         valid_login = False
         if user_data and user_data.get('password_hash'):
+            h = user_data['password_hash']
+            log_entry['hash_preview'] = h[:10] + '...'
+            
             # Try standard Werkzeug hash
-            if check_password_hash(user_data['password_hash'], password):
-                valid_login = True
+            try:
+                if check_password_hash(h, password):
+                    valid_login = True
+                    log_entry['check_result'] = 'True'
+                else:
+                    log_entry['check_result'] = 'False'
+            except Exception as e:
+                log_entry['check_error'] = str(e)
+                
             # Fallback for legacy hashes (e.g. raw SHA256)
-            elif check_legacy_hash(user_data['password_hash'], password):
+            if not valid_login and check_legacy_hash(h, password):
                 valid_login = True
+                log_entry['legacy_check'] = 'True'
+                
+        login_attempts_log.append(log_entry)
+        # Keep only last 10
+        if len(login_attempts_log) > 10:
+            login_attempts_log.pop(0)
+
+        if valid_login:
                 
         if valid_login:
             user = User(id=user_data['id'], 
@@ -258,7 +292,9 @@ def debug_users():
         # Safe version check
         w_ver = getattr(werkzeug, '__version__', 'unknown')
         
-        html = f"<h1>Debug Users (Werkzeug {w_ver})</h1><ul>"
+        html = f"<h1>Debug Users (Werkzeug {w_ver})</h1>"
+        html += f"<p><a href='/debug/login_attempts'>View Login Attempts Log</a></p>"
+        html += "<ul>"
         for r in rows:
             u = dict(r)
             h = u.get('password_hash', '')
@@ -271,6 +307,17 @@ def debug_users():
                     is_valid = f"Error: {e}"
             
             html += f"<li>User: {u.get('username')} | Role: {u.get('role')} | Hash: {h[:20]}...{h[-10:] if h and len(h)>20 else ''} (Len: {len(h) if h else 0}) | Valid('admin'): {is_valid}</li>"
+        html += "</ul>"
+        return html
+    except Exception as e:
+        return f"Error: {e}"
+
+@app.route('/debug/login_attempts')
+def debug_login_attempts():
+    try:
+        html = "<h1>Login Attempts Log</h1><ul>"
+        for entry in reversed(login_attempts_log):
+            html += f"<li>{entry}</li>"
         html += "</ul>"
         return html
     except Exception as e:
