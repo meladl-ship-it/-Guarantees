@@ -54,13 +54,16 @@ class User(UserMixin):
             conn = get_db_connection()
             
             # Configure cursor/factory based on DB type
-            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             else:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
             sql = normalize_query("SELECT * FROM users WHERE id = ?")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
             cursor.execute(sql, (user_id,))
             user = cursor.fetchone()
             conn.close()
@@ -75,13 +78,17 @@ class User(UserMixin):
         try:
             conn = get_db_connection()
             
-            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             else:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-            cursor.execute(normalize_query("SELECT * FROM users WHERE email = ?"), (email,))
+            sql = normalize_query("SELECT * FROM users WHERE email = ?")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+            cursor.execute(sql, (email,))
             user = cursor.fetchone()
             conn.close()
             
@@ -95,13 +102,17 @@ class User(UserMixin):
     def get_by_username(username):
         try:
             conn = get_db_connection()
-            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             else:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-            cursor.execute(normalize_query("SELECT * FROM users WHERE username = ?"), (username,))
+            sql = normalize_query("SELECT * FROM users WHERE username = ?")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+            cursor.execute(sql, (username,))
             user = cursor.fetchone()
             conn.close()
             
@@ -118,7 +129,8 @@ class User(UserMixin):
         try:
             conn = get_db_connection()
             
-            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            if is_postgres:
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             else:
                 conn.row_factory = sqlite3.Row
@@ -126,13 +138,18 @@ class User(UserMixin):
             
             password_hash = generate_password_hash(password) if password else None
             
-            cursor.execute(normalize_query("INSERT INTO users (username, email, role, password_hash) VALUES (?, ?, ?, ?)"), 
-                         (username, email, role, password_hash))
+            sql = normalize_query("INSERT INTO users (username, email, role, password_hash) VALUES (?, ?, ?, ?)")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+            cursor.execute(sql, (username, email, role, password_hash))
             
             # Handle fetching ID for new user
-            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            if is_postgres:
                 # For Postgres, fetch the ID by email since lastrowid isn't reliable/supported the same way
-                cursor.execute(normalize_query("SELECT id FROM users WHERE email = ?"), (email,))
+                sql_id = normalize_query("SELECT id FROM users WHERE email = ?")
+                if is_postgres:
+                    sql_id = sql_id.replace('?', '%s')
+                cursor.execute(sql_id, (email,))
                 row = cursor.fetchone()
                 user_id = row[0] if row else None
             else:
