@@ -377,6 +377,10 @@ def forgot_password():
         
         if target_user and target_user.get('email'):
             try:
+                # Debug info
+                print(f"Attempting to send email to: {target_user['email']}")
+                print(f"SMTP Config: Server={app.config['MAIL_SERVER']}, Port={app.config['MAIL_PORT']}, TLS={app.config['MAIL_USE_TLS']}, User={app.config['MAIL_USERNAME']}")
+                
                 # Generate Token
                 token = serializer.dumps(target_user['email'], salt='password-reset-salt')
                 reset_url = url_for('reset_password', token=token, _external=True)
@@ -397,10 +401,16 @@ def forgot_password():
                 flash('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.', 'success')
             except Exception as e:
                 print(f"Mail Error: {e}")
-                flash(f'حدث خطأ أثناء إرسال البريد الإلكتروني: {str(e)}', 'danger')
+                import traceback
+                traceback.print_exc()
+                # Show actual error to user for debugging
+                flash(f'فشل الإرسال: {str(e)}', 'danger')
         else:
-            # Generic message for security (don't reveal if user exists or not)
-            flash('إذا كان الحساب موجوداً ولديه بريد إلكتروني مسجل، سيتم إرسال التعليمات.', 'info')
+            # Debugging: tell user why it failed
+            if not target_user:
+                flash(f'لم يتم العثور على مستخدم بالبيانات المدخلة: {identifier}', 'warning')
+            elif not target_user.get('email'):
+                flash(f'المستخدم {target_user["username"]} موجود ولكن ليس لديه بريد إلكتروني مسجل.', 'warning')
             
         return redirect(url_for('forgot_password'))
         
