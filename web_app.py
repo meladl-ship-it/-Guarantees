@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer
 
 # Ensure we can import db_adapter from current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -34,6 +36,17 @@ else:
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_session_management' # Change this in production!
+
+# Configure Mail
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+
+mail = Mail(app)
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 # Initialize Login Manager
 login_manager = LoginManager()
@@ -123,6 +136,26 @@ class User(UserMixin):
         except Exception as e:
             print(f"Error fetching user by username: {e}")
         return None
+
+    @staticmethod
+    def update_password(user_id, new_password):
+        try:
+            conn = get_db_connection()
+            is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
+            
+            password_hash = generate_password_hash(new_password)
+            sql = normalize_query("UPDATE users SET password_hash = ? WHERE id = ?")
+            if is_postgres:
+                sql = sql.replace('?', '%s')
+            
+            cursor = conn.cursor()
+            cursor.execute(sql, (password_hash, user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error updating password: {e}")
+            return False
 
     @staticmethod
     def create(username, email, role='user', password=None):
@@ -324,20 +357,68 @@ def forgot_password():
         
         target_user = user_by_name or user_by_email
         
-        if target_user:
-            # In a real app with SMTP, we would send an email here.
-            # For this internal tool without SMTP config, we notify the user to contact admin.
-            # We could also log this request to a table for admins to see.
-            print(f"Password reset requested for: {target_user.username} ({target_user.email})")
-            flash('تم استلام طلبك. يرجى مراجعة مسؤول النظام لإعادة تعيين كلمة المرور.', 'info')
+        if target_user and target_user.get('email'):
+            try:
+                # Generate Token
+                token = serializer.dumps(target_user['email'], salt='password-reset-salt')
+                reset_url = url_for('reset_password', token=token, _external=True)
+                
+                # Send Email
+                msg = Message("إعادة تعيين كلمة المرور - نظام الضمانات", recipients=[target_user['email']])
+                msg.body = f"""
+                مرحباً {target_user['username']}،
+                
+                لقد طلبت إعادة تعيين كلمة المرور الخاصة بك.
+                الرجاء الضغط على الرابط التالي لتعيين كلمة مرور جديدة:
+                {reset_url}
+                
+                الرابط صالح لمدة ساعة واحدة.
+                إذا لم تقم بهذا الطلب، يمكنك تجاهل هذه الرسالة.
+                """
+                mail.send(msg)
+                flash('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.', 'success')
+            except Exception as e:
+                print(f"Mail Error: {e}")
+                flash(f'حدث خطأ أثناء إرسال البريد الإلكتروني: {str(e)}', 'danger')
         else:
             # Generic message for security (don't reveal if user exists or not)
-            # But for internal tool, maybe be more specific? No, stick to standard practice.
-            flash('إذا كان الحساب موجوداً، سيتم إرسال التعليمات إلى المسؤول.', 'info')
+            flash('إذا كان الحساب موجوداً ولديه بريد إلكتروني مسجل، سيتم إرسال التعليمات.', 'info')
             
         return redirect(url_for('forgot_password'))
         
     return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
+    try:
+        email = serializer.loads(token, salt='password-reset-salt', max_age=3600)
+    except:
+        flash('الرابط غير صالح أو منتهي الصلاحية.', 'danger')
+        return redirect(url_for('forgot_password'))
+        
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if password != confirm_password:
+            flash('كلمتا المرور غير متطابقتين.', 'danger')
+            return render_template('reset_password.html')
+            
+        user_data = User.get_by_email(email)
+        if user_data:
+            # Update password
+            if User.update_password(user_data.id, password):
+                flash('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success')
+                return redirect(url_for('welcome'))
+            else:
+                flash('حدث خطأ أثناء تحديث كلمة المرور.', 'danger')
+        else:
+            flash('المستخدم غير موجود.', 'danger')
+            
+    return render_template('reset_password.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
