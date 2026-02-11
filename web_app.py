@@ -375,6 +375,48 @@ def debug_info():
     <p>Remote Addr: {request.remote_addr}</p>
     """
 
+@app.route('/force-reset-admin')
+def force_reset_admin():
+    # Security check: only allow if a specific secret key is provided
+    key = request.args.get('key')
+    if key != 'TraeEmergencyFix2025':
+        return "Access Denied", 403
+    
+    try:
+        # Find admin user
+        user_data = User.get_by_username('admin')
+        if not user_data:
+            # Try by email if username not found
+            user_data = User.get_by_email('m.eladl@abs-haj.com')
+            
+        if not user_data:
+             # Try to create if missing (failsafe)
+             User.create('admin', 'm.eladl@abs-haj.com', 'admin', 'admin')
+             return "<h1>Success</h1><p>Admin user was missing. Created new admin user with password: <b>admin</b></p><p><a href='/login'>Login Now</a></p>"
+
+        # Get ID (handle dict vs object)
+        if isinstance(user_data, dict):
+            user_id = user_data['id']
+        else:
+            user_id = user_data.id
+            
+        # Force update
+        new_pass = 'admin' # Default temporary password
+        if User.update_password(user_id, new_pass):
+            return f"""
+            <div style='font-family: Arial; text-align: center; margin-top: 50px;'>
+                <h1 style='color: green;'>تم إعادة تعيين كلمة المرور بنجاح</h1>
+                <p>كلمة المرور الجديدة للمستخدم <b>admin</b> هي:</p>
+                <h2 style='background: #f0f0f0; padding: 10px; display: inline-block;'>{new_pass}</h2>
+                <br><br>
+                <a href='/login' style='background: #0d6efd; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>تسجيل الدخول الآن</a>
+            </div>
+            """
+        else:
+            return "Failed to update password in DB", 500
+    except Exception as e:
+        return f"Error: {e}", 500
+
 @app.route('/test-email')
 def test_email_route():
     results = []
