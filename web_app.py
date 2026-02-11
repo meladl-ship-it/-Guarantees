@@ -10,7 +10,15 @@ from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_mail import Mail, Message
+try:
+    from flask_mail import Mail, Message
+except ImportError:
+    # Fallback: stub the classes so the file still imports
+    class Mail:
+        def __init__(self, app=None): pass
+        def init_app(self, app): pass
+    class Message:
+        def __init__(self, subject='', recipients=None, body=''): pass
 from itsdangerous import URLSafeTimedSerializer
 
 from threading import Thread
@@ -366,6 +374,25 @@ def debug_info():
     <p>Base URL: {request.base_url}</p>
     <p>Remote Addr: {request.remote_addr}</p>
     """
+
+@app.route('/test-email')
+def test_email_route():
+    try:
+        # Use the admin email or a fallback
+        email = 'm.eladl@abs-haj.com'
+        msg = Message("Test Email - Debug", recipients=[email])
+        msg.body = f"""
+        Success!
+        Email configuration is working.
+        Server: {app.config.get('MAIL_SERVER')}
+        Port: {app.config.get('MAIL_PORT')}
+        User: {app.config.get('MAIL_USERNAME')}
+        """
+        mail.send(msg)
+        return f"<h1>Email Sent Successfully!</h1><p>Check inbox for {email}</p>"
+    except Exception as e:
+        import traceback
+        return f"<h1>Email Failed</h1><pre>{traceback.format_exc()}</pre>"
 
 @app.route('/')
 def welcome():
