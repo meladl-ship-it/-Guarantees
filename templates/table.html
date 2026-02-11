@@ -75,7 +75,7 @@
                     <tbody id="tableBody">
                         {% for g in guarantees %}
                         <tr data-bank="{{ g.bank }}" data-status="{{ g.display_status }}" data-type="{{ g.g_type }}" 
-                            data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }}">
+                            data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }} {{ g.amount }}">
                             <td class="fw-bold text-primary">{{ g.g_no }}</td>
                             <td>{{ g.bank }}</td>
                             <td><span class="badge bg-light text-dark border">{{ g.g_type }}</span></td>
@@ -331,8 +331,22 @@
 
             const matchSearch = rowSearch.includes(searchText);
             const matchBank = !bank || rowBank === bank;
-            const matchStatus = !status || rowStatus === status;
             const matchType = !type || rowType === type;
+
+            let matchStatus = true;
+            if (status) {
+                matchStatus = rowStatus === status;
+            } else {
+                // If "All" status selected:
+                // Hide "منتهي" unless searching (and finding a match)
+                if (rowStatus === 'منتهي') {
+                    if (searchText.length > 0 && matchSearch) {
+                        matchStatus = true;
+                    } else {
+                        matchStatus = false;
+                    }
+                }
+            }
 
             if (matchSearch && matchBank && matchStatus && matchType) {
                 row.style.display = '';
@@ -348,6 +362,9 @@
     bankFilter.addEventListener('change', filterTable);
     statusFilter.addEventListener('change', filterTable);
     typeFilter.addEventListener('change', filterTable);
+
+    // Initial call to apply default filters (hide expired)
+    filterTable();
 
     // Edit Modal Logic
     document.querySelectorAll('.edit-btn').forEach(btn => {
