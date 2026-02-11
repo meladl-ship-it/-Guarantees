@@ -375,48 +375,6 @@ def debug_info():
     <p>Remote Addr: {request.remote_addr}</p>
     """
 
-@app.route('/force-reset-admin')
-def force_reset_admin():
-    # Security check: only allow if a specific secret key is provided
-    key = request.args.get('key')
-    if key != 'TraeEmergencyFix2025':
-        return "Access Denied", 403
-    
-    try:
-        # Find admin user
-        user_data = User.get_by_username('admin')
-        if not user_data:
-            # Try by email if username not found
-            user_data = User.get_by_email('m.eladl@abs-haj.com')
-            
-        if not user_data:
-             # Try to create if missing (failsafe)
-             User.create('admin', 'm.eladl@abs-haj.com', 'admin', 'admin')
-             return "<h1>Success</h1><p>Admin user was missing. Created new admin user with password: <b>admin</b></p><p><a href='/login'>Login Now</a></p>"
-
-        # Get ID (handle dict vs object)
-        if isinstance(user_data, dict):
-            user_id = user_data['id']
-        else:
-            user_id = user_data.id
-            
-        # Force update
-        new_pass = 'admin' # Default temporary password
-        if User.update_password(user_id, new_pass):
-            return f"""
-            <div style='font-family: Arial; text-align: center; margin-top: 50px;'>
-                <h1 style='color: green;'>تم إعادة تعيين كلمة المرور بنجاح</h1>
-                <p>كلمة المرور الجديدة للمستخدم <b>admin</b> هي:</p>
-                <h2 style='background: #f0f0f0; padding: 10px; display: inline-block;'>{new_pass}</h2>
-                <br><br>
-                <a href='/login' style='background: #0d6efd; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>تسجيل الدخول الآن</a>
-            </div>
-            """
-        else:
-            return "Failed to update password in DB", 500
-    except Exception as e:
-        return f"Error: {e}", 500
-
 @app.route('/test-email')
 def test_email_route():
     results = []
@@ -503,7 +461,43 @@ def forgot_password():
         return redirect(url_for('dashboard'))
         
     if request.method == 'POST':
-        identifier = request.form.get('identifier') # Username or Email
+        # Check for Master Key Reset
+        action = request.form.get('action')
+        identifier = request.form.get('identifier') or request.form.get('email') # Username or Email
+
+        if action == 'master_reset':
+            master_key_input = request.form.get('master_key')
+            real_master_key = os.environ.get('MASTER_KEY')
+            
+            if real_master_key and master_key_input == real_master_key:
+                # Master Key Match!
+                # Find user
+                user_by_name = User.get_by_username(identifier)
+                user_by_email = User.get_by_email(identifier) if not user_by_name else None
+                target_user = user_by_name or user_by_email
+                
+                if target_user:
+                     # Normalize target_user to dict for easier handling
+                    target_email = None
+                    if isinstance(target_user, dict):
+                        target_email = target_user.get('email')
+                    else:
+                        target_email = getattr(target_user, 'email', None)
+                    
+                    # If user has no email, use a placeholder for the token logic
+                    email_for_token = target_email or f"{identifier}@system.local"
+                    
+                    token = serializer.dumps(email_for_token, salt='password-reset-salt')
+                    flash('تم التحقق من مفتاح الطوارئ بنجاح. يمكنك تعيين كلمة المرور الآن.', 'success')
+                    return redirect(url_for('reset_password', token=token))
+                else:
+                    flash('المستخدم غير موجود.', 'danger')
+            else:
+                flash('مفتاح الطوارئ غير صحيح.', 'danger')
+            
+            return redirect(url_for('forgot_password'))
+
+        # Normal Email Flow
         
         # Check if user exists by username OR email
         user_by_name = User.get_by_username(identifier)
@@ -595,10 +589,20 @@ def reset_password(token):
             flash('كلمتا المرور غير متطابقتين.', 'danger')
             return render_template('reset_password.html')
             
+        # Try to find user by email first
         user_data = User.get_by_email(email)
+        
+        # If email was a placeholder (e.g. admin@system.local), try to extract username
+        if not user_data and "@system.local" in email:
+             username = email.split('@')[0]
+             user_data = User.get_by_username(username)
+             
         if user_data:
             # Update password
-            if User.update_password(user_data.id, password):
+            # Handle dict vs object
+            user_id = user_data['id'] if isinstance(user_data, dict) else user_data.id
+            
+            if User.update_password(user_id, password):
                 flash('تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.', 'success')
                 return redirect(url_for('welcome'))
             else:
