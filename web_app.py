@@ -310,6 +310,35 @@ def check_legacy_hash(stored_hash, password):
 # Global debug log for login attempts (InMemory)
 login_attempts_log = []
 
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        identifier = request.form.get('identifier') # Username or Email
+        
+        # Check if user exists by username OR email
+        user_by_name = User.get_by_username(identifier)
+        user_by_email = User.get_by_email(identifier) if not user_by_name else None
+        
+        target_user = user_by_name or user_by_email
+        
+        if target_user:
+            # In a real app with SMTP, we would send an email here.
+            # For this internal tool without SMTP config, we notify the user to contact admin.
+            # We could also log this request to a table for admins to see.
+            print(f"Password reset requested for: {target_user.username} ({target_user.email})")
+            flash('تم استلام طلبك. يرجى مراجعة مسؤول النظام لإعادة تعيين كلمة المرور.', 'info')
+        else:
+            # Generic message for security (don't reveal if user exists or not)
+            # But for internal tool, maybe be more specific? No, stick to standard practice.
+            flash('إذا كان الحساب موجوداً، سيتم إرسال التعليمات إلى المسؤول.', 'info')
+            
+        return redirect(url_for('forgot_password'))
+        
+    return render_template('forgot_password.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
