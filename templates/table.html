@@ -410,6 +410,10 @@
             if (matchSearch && matchBank && matchStatus && matchType) {
                 row.style.display = '';
                 visibleCount++;
+                // Update sequence number dynamically
+                if (row.cells.length > 0) {
+                    row.cells[0].textContent = visibleCount;
+                }
             } else {
                 row.style.display = 'none';
             }
