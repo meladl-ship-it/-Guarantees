@@ -111,6 +111,17 @@ def check_and_migrate_db():
                 cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
                 conn.commit()
                 print("Migrated: Added email to users table (Postgres)")
+
+            # Check if is_approved column exists
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='is_approved'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0")
+                # Auto-approve admin
+                cursor.execute("UPDATE users SET is_approved = 1 WHERE role = 'admin'")
+                # Auto-approve existing users to avoid lockout
+                cursor.execute("UPDATE users SET is_approved = 1 WHERE is_approved = 0")
+                conn.commit()
+                print("Migrated: Added is_approved to users table (Postgres)")
         else:
             # SQLite
             cursor = conn.cursor()
@@ -125,6 +136,14 @@ def check_and_migrate_db():
                 cursor.execute("ALTER TABLE users ADD COLUMN email TEXT")
                 conn.commit()
                 print("Migrated: Added email to users table (SQLite)")
+
+            if 'is_approved' not in columns:
+                cursor.execute("ALTER TABLE users ADD COLUMN is_approved INTEGER DEFAULT 0")
+                # Auto-approve existing users
+                cursor.execute("UPDATE users SET is_approved = 1")
+                conn.commit()
+                print("Migrated: Added is_approved to users table (SQLite)")
+
                 
     except Exception as e:
         print(f"Migration error: {e}")
@@ -223,7 +242,8 @@ def ensure_db():
                 pass_hash TEXT,
                 role TEXT DEFAULT 'user',
                 active INTEGER DEFAULT 1,
-                email TEXT
+                email TEXT,
+                is_approved INTEGER DEFAULT 0
             )"""
         )
         

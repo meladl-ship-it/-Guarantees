@@ -77,11 +77,12 @@ login_manager.login_view = 'welcome'
 
 # User Class
 class User(UserMixin):
-    def __init__(self, id, username, email, role):
+    def __init__(self, id, username, email, role, is_approved=1):
         self.id = str(id)
         self.username = username
         self.email = email
         self.role = role
+        self.is_approved = is_approved
     
     @staticmethod
     def get(user_id):
@@ -103,7 +104,17 @@ class User(UserMixin):
             user = cursor.fetchone()
             conn.close()
             if user:
-                return User(id=user['id'], username=user['username'], email=user.get('email'), role=user.get('role', 'user'))
+                # Convert sqlite3.Row to dict to ensure .get() works
+                if not isinstance(user, dict):
+                    user = dict(user)
+                    
+                return User(
+                    id=user['id'], 
+                    username=user['username'], 
+                    email=user.get('email'), 
+                    role=user.get('role', 'user'),
+                    is_approved=user.get('is_approved', 1)
+                )
         except Exception as e:
             print(f"Error fetching user: {e}")
         return None
@@ -128,7 +139,17 @@ class User(UserMixin):
             conn.close()
             
             if user:
-                return User(id=user['id'], username=user['username'], email=user.get('email'), role=user.get('role', 'user'))
+                # Convert sqlite3.Row to dict to ensure .get() works
+                if not isinstance(user, dict):
+                    user = dict(user)
+                    
+                return User(
+                    id=user['id'], 
+                    username=user['username'], 
+                    email=user.get('email'), 
+                    role=user.get('role', 'user'),
+                    is_approved=user.get('is_approved', 1)
+                )
         except Exception as e:
             print(f"Error fetching user by email: {e}")
         return None
@@ -180,7 +201,7 @@ class User(UserMixin):
             return False
 
     @staticmethod
-    def create(username, email, role='user', password=None):
+    def create(username, email, role='user', password=None, is_approved=0):
         try:
             conn = get_db_connection()
             
@@ -193,10 +214,10 @@ class User(UserMixin):
             
             password_hash = generate_password_hash(password) if password else None
             
-            sql = normalize_query("INSERT INTO users (username, email, role, password_hash) VALUES (?, ?, ?, ?)")
+            sql = normalize_query("INSERT INTO users (username, email, role, password_hash, is_approved) VALUES (?, ?, ?, ?, ?)")
             if is_postgres:
                 sql = sql.replace('?', '%s')
-            cursor.execute(sql, (username, email, role, password_hash))
+            cursor.execute(sql, (username, email, role, password_hash, is_approved))
             
             # Handle fetching ID for new user
             if is_postgres:
@@ -212,13 +233,13 @@ class User(UserMixin):
                 
             conn.commit()
             conn.close()
-            return User(id=user_id, username=username, email=email, role=role)
+            return User(id=user_id, username=username, email=email, role=role, is_approved=is_approved)
         except Exception as e:
             print(f"Error creating user: {e}")
         return None
 
     @staticmethod
-    def update(user_id, username=None, email=None, role=None, password=None):
+    def update(user_id, username=None, email=None, role=None, password=None, is_approved=None):
         try:
             conn = get_db_connection()
             is_postgres = PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection)
@@ -243,6 +264,9 @@ class User(UserMixin):
             if password:
                 updates.append("password_hash = ?")
                 params.append(generate_password_hash(password))
+            if is_approved is not None:
+                updates.append("is_approved = ?")
+                params.append(is_approved)
             
             if not updates:
                 return False
@@ -302,7 +326,13 @@ class User(UserMixin):
             users = []
             for row in rows:
                 u = dict(row)
-                users.append(User(id=u['id'], username=u['username'], email=u.get('email'), role=u.get('role', 'user')))
+                users.append(User(
+                    id=u['id'], 
+                    username=u['username'], 
+                    email=u.get('email'), 
+                    role=u.get('role', 'user'),
+                    is_approved=u.get('is_approved', 1)
+                ))
             return users
         except Exception as e:
             print(f"Error fetching all users: {e}")
@@ -375,6 +405,31 @@ def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     return render_template('forgot_password.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Check if user already exists
+        if User.get_by_username(username) or User.get_by_email(email):
+            flash('اسم المستخدم أو البريد الإلكتروني مسجل بالفعل', 'danger')
+        else:
+            # Create user with is_approved=0 (Pending)
+            # Default role is 'user'
+            new_user = User.create(username, email, 'user', password, is_approved=0)
+            if new_user:
+                flash('تم تسجيل حسابك بنجاح! يرجى انتظار موافقة المسؤول لتفعيل الحساب.', 'success')
+                return redirect(url_for('login'))
+            else:
+                flash('حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى.', 'danger')
+                
+    return render_template('register.html')
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
@@ -472,7 +527,14 @@ def login():
             user = User(id=user_data['id'], 
                        username=user_data['username'], 
                        email=user_data.get('email'), 
-                       role=user_data.get('role', 'user'))
+                       role=user_data.get('role', 'user'),
+                       is_approved=user_data.get('is_approved', 1))
+            
+            # Check approval status
+            if not user.is_approved:
+                flash('الحساب قيد المراجعة من قبل المسؤول.', 'warning')
+                return render_template('welcome.html')
+
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
@@ -1206,6 +1268,20 @@ def delete_user(user_id):
         flash('تم حذف المستخدم بنجاح', 'success')
     else:
         flash('حدث خطأ أثناء حذف المستخدم', 'danger')
+        
+    return redirect(url_for('settings'))
+
+@app.route('/settings/users/approve/<user_id>', methods=['POST'])
+@login_required
+def approve_user(user_id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بهذا الإجراء', 'danger')
+        return redirect(url_for('dashboard'))
+        
+    if User.update(user_id, is_approved=1):
+        flash('تم تفعيل حساب المستخدم بنجاح', 'success')
+    else:
+        flash('حدث خطأ أثناء تفعيل المستخدم', 'danger')
         
     return redirect(url_for('settings'))
 

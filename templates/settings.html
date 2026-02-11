@@ -122,6 +122,7 @@
                         <th>اسم المستخدم</th>
                         <th>البريد الإلكتروني</th>
                         <th>الصلاحية</th>
+                        <th>الحالة</th>
                         <th>إجراءات</th>
                     </tr>
                 </thead>
@@ -143,6 +144,21 @@
                             </span>
                         </td>
                         <td>
+                            {% if user.is_approved %}
+                                <span class="badge bg-success">نشط</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">في انتظار التفعيل</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not user.is_approved %}
+                            <form action="{{ url_for('approve_user', user_id=user.id) }}" method="POST" class="d-inline">
+                                <button class="btn action-btn btn-success" title="تفعيل الحساب" style="background-color: #d1e7dd; color: #0f5132;">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+
                             <button class="btn action-btn btn-edit" title="تعديل" 
                                     onclick="openEditModal('{{ user.id }}', '{{ user.username }}', '{{ user.email or '' }}', '{{ user.role }}')">
                                 <i class="fas fa-edit"></i>
