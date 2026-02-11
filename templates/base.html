@@ -20,47 +20,127 @@
             display: flex;
             flex-direction: column;
             background-color: #f4f6f9;
+            overflow-x: hidden; /* Prevent horizontal scroll */
         }
         
-        /* Navbar Styling */
-        .navbar {
-            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            padding: 0.8rem 1rem;
+        /* Sidebar Styling */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 280px;
+            background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            transition: all 0.3s ease;
+            z-index: 1040;
+            box-shadow: -4px 0 10px rgba(0,0,0,0.1);
+            transform: translateX(0); /* Visible by default on desktop */
         }
-        .navbar-brand {
-            color: #fff !important;
-            font-weight: 700;
-            font-size: 1.4rem;
+        
+        .sidebar.collapsed {
+            transform: translateX(100%); /* Hidden (moved right) */
+        }
+        
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex;
             align-items: center;
+            justify-content: center;
         }
-        .navbar-brand img {
-            height: 45px;
-            margin-left: 12px;
+        
+        .sidebar-brand {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: #fff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .sidebar-brand img {
+            height: 40px;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 8px;
             padding: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
+        .sidebar-menu {
+            padding: 1rem 0;
+            list-style: none;
+            margin: 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
         .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
             color: rgba(255, 255, 255, 0.8) !important;
-            font-weight: 600;
-            margin: 0 8px;
-            border-radius: 8px;
-            padding: 8px 16px !important;
-            transition: all 0.3s;
+            text-decoration: none;
+            transition: all 0.2s;
+            border-right: 4px solid transparent;
         }
+        
         .nav-link:hover, .nav-link.active {
-            color: #1e3c72 !important;
-            background-color: #fff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff !important;
+            border-right-color: #ffd700; /* Gold accent */
         }
+        
         .nav-link i {
-            margin-left: 8px;
+            margin-left: 12px;
+            width: 24px;
+            text-align: center;
+            font-size: 1.1rem;
         }
 
+        /* Top Header Styling */
+        .top-header {
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            margin-right: 280px; /* Space for sidebar */
+            transition: margin-right 0.3s ease;
+        }
+        
+        .top-header.expanded {
+            margin-right: 0; /* No space when sidebar is collapsed */
+        }
+        
+        .toggle-btn {
+            background: none;
+            border: none;
+            color: #1e3c72;
+            font-size: 1.4rem;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        /* Main Content Styling */
+        .main-wrapper {
+            flex: 1;
+            margin-right: 280px; /* Space for sidebar */
+            transition: margin-right 0.3s ease;
+            width: calc(100% - 280px);
+        }
+        
+        .main-wrapper.expanded {
+            margin-right: 0;
+            width: 100%;
+        }
+        
         /* Watermark */
         .watermark {
             position: fixed;
@@ -78,11 +158,6 @@
             pointer-events: none;
         }
         
-        main {
-            flex: 1;
-            position: relative;
-        }
-        
         footer {
             background-color: #fff;
             border-top: 1px solid #e9ecef;
@@ -90,7 +165,36 @@
             margin-top: auto;
             font-size: 0.95rem;
             color: #6c757d;
-            box-shadow: 0 -2px 4px rgba(0,0,0,0.02);
+        }
+        
+        /* Responsive */
+        @media (max-width: 991.98px) {
+            .sidebar {
+                transform: translateX(100%); /* Hidden by default on mobile */
+            }
+            .sidebar.show {
+                transform: translateX(0); /* Show when toggled */
+            }
+            
+            .top-header, .main-wrapper {
+                margin-right: 0;
+                width: 100%;
+            }
+            
+            /* Overlay when sidebar is open on mobile */
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 1035;
+            }
+            .sidebar-overlay.show {
+                display: block;
+            }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -98,57 +202,106 @@
 <body>
     <div class="watermark"></div>
 
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('welcome') }}">
+    <!-- Mobile Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="{{ url_for('welcome') }}" class="sidebar-brand">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo">
-                <span>شركة أبو سرهد - إدارة الضمانات</span>
+                <span>إدارة الضمانات</span>
             </a>
-            <button class="navbar-toggler bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>لوحة الإحصائيات</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'data_table' %}active{% endif %}" href="{{ url_for('data_table') }}">
+                    <i class="fas fa-table"></i>
+                    <span>سجل الضمانات</span>
+                </a>
+            </li>
+            {% if current_user.role == 'admin' %}
+            <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">
+                    <i class="fas fa-users-cog"></i>
+                    <span>إدارة المستخدمين</span>
+                </a>
+            </li>
+            {% endif %}
+            
+            <li class="nav-item mt-4 border-top border-secondary pt-2">
+                <a class="nav-link" href="{{ url_for('logout') }}">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>تسجيل الخروج</span>
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper" id="mainWrapper">
+        <!-- Top Header -->
+        <header class="top-header" id="topHeader">
+            <button class="toggle-btn" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                            <i class="fas fa-chart-pie"></i> لوحة الإحصائيات
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'data_table' %}active{% endif %}" href="{{ url_for('data_table') }}">
-                            <i class="fas fa-table"></i> سجل الضمانات
-                        </a>
-                    </li>
-                    {% if current_user.role == 'admin' %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">
-                            <i class="fas fa-users-cog"></i> إدارة المستخدمين
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-                <span class="text-white-50 small ms-3">
-                    <i class="fas fa-calendar-alt"></i> {{ today_date }}
+            
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary small">
+                    <i class="fas fa-calendar-alt ms-1"></i> {{ today_date }}
                 </span>
+                <div class="dropdown">
+                    <button class="btn btn-light rounded-circle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text text-muted">{{ current_user.username }}</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('logout') }}">خروج</a></li>
+                    </ul>
+                </div>
             </div>
-        </div>
-    </nav>
+        </header>
 
-    <!-- Main Content -->
-    <main class="container-fluid py-4">
-        {% block content %}{% endblock %}
-    </main>
+        <!-- Page Content -->
+        <main class="container-fluid py-4">
+            {% block content %}{% endblock %}
+        </main>
 
-    <!-- Footer -->
-    <footer class="text-center">
-        <div class="container">
-            <span>&copy; 2026 جميع الحقوق محفوظة - نظام إدارة الضمانات</span>
-        </div>
-    </footer>
+        <!-- Footer -->
+        <footer class="text-center">
+            <div class="container">
+                <span>&copy; 2026 جميع الحقوق محفوظة - نظام إدارة الضمانات</span>
+            </div>
+        </footer>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainWrapper = document.getElementById('mainWrapper');
+            const topHeader = document.getElementById('topHeader');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            // Check if mobile
+            if (window.innerWidth < 992) {
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            } else {
+                sidebar.classList.toggle('collapsed');
+                mainWrapper.classList.toggle('expanded');
+                topHeader.classList.toggle('expanded');
+            }
+        }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
