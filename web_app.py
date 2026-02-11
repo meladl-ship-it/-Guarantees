@@ -255,7 +255,10 @@ def debug_users():
         rows = cursor.fetchall()
         conn.close()
         
-        html = f"<h1>Debug Users (Werkzeug {werkzeug.__version__})</h1><ul>"
+        # Safe version check
+        w_ver = getattr(werkzeug, '__version__', 'unknown')
+        
+        html = f"<h1>Debug Users (Werkzeug {w_ver})</h1><ul>"
         for r in rows:
             u = dict(r)
             h = u.get('password_hash', '')
