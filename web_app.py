@@ -13,14 +13,26 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 
+# Load environment variables FIRST
+load_dotenv()
+
 # Ensure we can import db_adapter from current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE, check_and_migrate_db, ensure_db
 
+# Import psycopg2 if available to avoid NameErrors
+if PSYCOPG2_AVAILABLE:
+    import psycopg2
+    import psycopg2.extras
+    import psycopg2.extensions
+
 # Ensure DB schema is up to date (add password column if missing)
 # For cloud apps, we must ensure tables exist first
-ensure_db()
-check_and_migrate_db()
+try:
+    ensure_db()
+    check_and_migrate_db()
+except Exception as e:
+    print(f">>> SYSTEM WARNING: DB Init failed: {e}")
 
 # --- Auto-fix: Ensure admin has the correct email ---
 try:
@@ -39,12 +51,6 @@ try:
 except Exception as e:
     print(f">>> SYSTEM WARNING: Could not update admin email: {e}")
 # ----------------------------------------------------
-
-if PSYCOPG2_AVAILABLE:
-    import psycopg2.extras
-
-# Load environment variables
-load_dotenv()
 
 # Log Database Status for debugging
 if os.environ.get('DATABASE_URL'):
