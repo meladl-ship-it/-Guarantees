@@ -26,6 +26,12 @@ if PSYCOPG2_AVAILABLE:
 # Load environment variables
 load_dotenv()
 
+# Log Database Status for debugging
+if os.environ.get('DATABASE_URL'):
+    print(">>> SYSTEM STATUS: Configured to use PostgreSQL via DATABASE_URL")
+else:
+    print(">>> SYSTEM WARNING: DATABASE_URL not found. Using local SQLite (Data will be lost on restart!)")
+
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_session_management' # Change this in production!
 
