@@ -165,6 +165,13 @@
                 </button>
             </form>
 
+            <div class="mb-4">
+                <p class="mb-0 text-white-50 fs-6">
+                    ليس لديك حساب؟ 
+                    <a href="{{ url_for('register') }}" class="text-warning text-decoration-none fw-bold">إنشاء حساب جديد</a>
+                </p>
+            </div>
+
             <script>
                 const togglePassword = document.querySelector('#togglePassword');
                 const password = document.querySelector('#password');
