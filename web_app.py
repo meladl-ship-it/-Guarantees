@@ -370,48 +370,10 @@ def check_legacy_hash(stored_hash, password):
 # Global debug log for login attempts (InMemory)
 login_attempts_log = []
 
-@app.route('/forgot-password', methods=['GET', 'POST'])
+@app.route('/forgot-password')
 def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
-        
-    if request.method == 'POST':
-        # Check for Master Key Reset
-        action = request.form.get('action')
-        identifier = request.form.get('identifier') or request.form.get('email') # Username or Email
-
-        if action == 'master_reset' or request.form.get('master_key'):
-            master_key_input = request.form.get('master_key')
-            real_master_key = os.environ.get('MASTER_KEY')
-            
-            if real_master_key and master_key_input == real_master_key:
-                # Master Key Match!
-                # Find user
-                user_by_name = User.get_by_username(identifier)
-                user_by_email = User.get_by_email(identifier) if not user_by_name else None
-                target_user = user_by_name or user_by_email
-                
-                if target_user:
-                     # Normalize target_user to dict for easier handling
-                    target_email = None
-                    if isinstance(target_user, dict):
-                        target_email = target_user.get('email')
-                    else:
-                        target_email = getattr(target_user, 'email', None)
-                    
-                    # If user has no email, use a placeholder for the token logic
-                    email_for_token = target_email or f"{identifier}@system.local"
-                    
-                    token = serializer.dumps(email_for_token, salt='password-reset-salt')
-                    flash('تم التحقق من مفتاح الطوارئ بنجاح. يمكنك تعيين كلمة المرور الآن.', 'success')
-                    return redirect(url_for('reset_password', token=token))
-                else:
-                    flash('المستخدم غير موجود.', 'danger')
-            else:
-                flash('مفتاح الطوارئ غير صحيح.', 'danger')
-            
-            return redirect(url_for('forgot_password'))
-
     return render_template('forgot_password.html')
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
