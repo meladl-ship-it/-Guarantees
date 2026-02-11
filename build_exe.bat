@@ -2,6 +2,10 @@
 chcp 65001 >nul
 echo Starting build process...
 
+REM Kill existing instances
+taskkill /F /IM Guarantees.exe /T >nul 2>&1
+if errorlevel 0 echo Closed running instances of Guarantees.exe
+
 REM Map current directory to Z: to handle Unicode paths
 subst Z: /d >nul 2>&1
 subst Z: "%~dp0."

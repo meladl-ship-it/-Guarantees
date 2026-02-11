@@ -146,14 +146,34 @@
                     <label for="username" class="form-label">اسم المستخدم</label>
                     <input type="text" class="form-control" id="username" name="username" placeholder="admin" required>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 text-start">
                     <label for="password" class="form-label">كلمة المرور</label>
-                    <input type="password" class="form-control" id="password" name="password" placeholder="admin" required>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="admin" required>
+                        <button class="btn btn-outline-light" type="button" id="togglePassword" style="border-color: rgba(255,255,255,0.5);">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <button type="submit" class="btn-enter w-100">
                     <i class="fas fa-sign-in-alt ms-2"></i> دخول
                 </button>
             </form>
+
+            <script>
+                const togglePassword = document.querySelector('#togglePassword');
+                const password = document.querySelector('#password');
+
+                togglePassword.addEventListener('click', function (e) {
+                    // toggle the type attribute
+                    const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                    password.setAttribute('type', type);
+                    
+                    // toggle the eye slash icon
+                    this.querySelector('i').classList.toggle('fa-eye-slash');
+                    this.querySelector('i').classList.toggle('fa-eye');
+                });
+            </script>
 
             <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
