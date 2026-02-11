@@ -255,16 +255,23 @@ def sync_data():
                 
                 # Check data integrity (handle ID casing or missing ID)
                 if guarantees_list:
-                    sample = guarantees_list[0]
-                    # Fix ID casing if needed
-                    if 'id' not in sample and 'ID' in sample:
-                        for g in guarantees_list:
+                    # First pass: Fix casing for ALL items and check ID validity
+                    valid_ids_count = 0
+                    for g in guarantees_list:
+                        # Fix ID casing if needed
+                        if 'id' not in g and 'ID' in g:
                             g['id'] = g.pop('ID')
-                    
-                    # If ID is still missing or None, remove from columns to allow auto-increment
-                    if 'id' not in sample or sample.get('id') is None:
+                        
+                        if g.get('id') is not None:
+                            valid_ids_count += 1
+
+                    # If ANY ID is missing/None, we must remove 'id' column from insertion to let DB auto-increment
+                    # This avoids the "null value in column id" error.
+                    # Ideally we want to preserve IDs, but safety first.
+                    if valid_ids_count < len(guarantees_list):
                         if 'id' in columns:
                             columns.remove('id')
+                            print(f"Warning: Removed 'id' from sync columns because {len(guarantees_list) - valid_ids_count} records have null/missing IDs.")
                 
                 # Build query
                 cols_str = ", ".join([f'"{c}"' for c in columns]) # Quote columns for safety
