@@ -2,15 +2,63 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Filters Toolbar -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="بحث برقم الضمان أو المستفيد...">
+                </div>
+                <div class="col-md-2">
+                    <select id="bankFilter" class="form-select">
+                        <option value="">كل البنوك</option>
+                        <!-- Options populated by JS or fixed list -->
+                        <option value="الراجحي">الراجحي</option>
+                        <option value="الأهلي">الأهلي</option>
+                        <option value="الرياض">الرياض</option>
+                        <option value="ساب">ساب</option>
+                        <option value="الإنماء">الإنماء</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="statusFilter" class="form-select">
+                        <option value="">كل الحالات</option>
+                        <option value="ساري">ساري</option>
+                        <option value="منتهي">منتهي</option>
+                        <option value="قارب على الانتهاء">قارب على الانتهاء</option>
+                        <option value="انتهى في انتظار التأكيد">انتهى في انتظار التأكيد</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="typeFilter" class="form-select">
+                        <option value="">كل الأنواع</option>
+                        <option value="ابتدائي">ابتدائي</option>
+                        <option value="نهائي">نهائي</option>
+                        <option value="دفعة مقدمة">دفعة مقدمة</option>
+                        <option value="مالي">مالي</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+                        <i class="fas fa-plus me-1"></i> إضافة ضمان
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="exportTableToExcel('guaranteesTable')">
+                        <i class="fas fa-file-excel"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm">
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
             <h5 class="mb-0 text-primary fw-bold"><i class="fas fa-list me-2"></i> سجل الضمانات الكامل</h5>
-            <span class="badge bg-primary rounded-pill">{{ guarantees|length }} ضمان</span>
+            <span class="badge bg-primary rounded-pill" id="rowCount">{{ guarantees|length }} ضمان</span>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle mb-0" style="font-size: 0.9rem;">
-                    <thead class="table-light sticky-top">
+            <div class="table-responsive" style="max-height: 75vh;">
+                <table class="table table-hover table-striped align-middle mb-0" id="guaranteesTable" style="font-size: 0.9rem;">
+                    <thead class="table-light sticky-top" style="z-index: 1;">
                         <tr>
                             <th>رقم الضمان</th>
                             <th>البنك</th>
@@ -21,26 +69,57 @@
                             <th>تاريخ الانتهاء</th>
                             <th>القسم</th>
                             <th>الحالة</th>
+                            <th>إجراءات</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tableBody">
                         {% for g in guarantees %}
-                        <tr>
-                            <td class="fw-bold">{{ g.g_no }}</td>
+                        <tr data-bank="{{ g.bank }}" data-status="{{ g.display_status }}" data-type="{{ g.g_type }}" 
+                            data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }}">
+                            <td class="fw-bold text-primary">{{ g.g_no }}</td>
                             <td>{{ g.bank }}</td>
                             <td><span class="badge bg-light text-dark border">{{ g.g_type }}</span></td>
-                            <td class="font-monospace text-primary fw-bold">{{ "{:,.2f}".format(g.amount) if g.amount else '0.00' }}</td>
+                            <td class="font-monospace fw-bold">{{ "{:,.2f}".format(g.amount) if g.amount else '0.00' }}</td>
                             <td class="text-truncate" style="max-width: 150px;" title="{{ g.beneficiary }}">{{ g.beneficiary }}</td>
                             <td>{{ g.issue_date }}</td>
                             <td>{{ g.end_date }}</td>
                             <td>{{ g.department }}</td>
                             <td>
-                                {% if g.user_status == 'ساري' %}
+                                {% if g.display_status == 'ساري' %}
                                     <span class="badge bg-success">ساري</span>
-                                {% elif g.user_status == 'منتهي' %}
+                                {% elif g.display_status == 'منتهي' %}
                                     <span class="badge bg-danger">منتهي</span>
+                                {% elif g.display_status == 'قارب على الانتهاء' %}
+                                    <span class="badge bg-warning text-dark">قارب على الانتهاء</span>
+                                {% elif g.display_status == 'انتهى في انتظار التأكيد' %}
+                                    <span class="badge bg-info text-dark">انتظار التأكيد</span>
                                 {% else %}
-                                    <span class="badge bg-warning text-dark">{{ g.user_status }}</span>
+                                    <span class="badge bg-secondary">{{ g.display_status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary edit-btn" 
+                                    data-id="{{ g.id }}"
+                                    data-gno="{{ g.g_no }}"
+                                    data-bank="{{ g.bank }}"
+                                    data-dept="{{ g.department }}"
+                                    data-type="{{ g.g_type }}"
+                                    data-amount="{{ g.amount }}"
+                                    data-beneficiary="{{ g.beneficiary }}"
+                                    data-project="{{ g.project_name }}"
+                                    data-issuedate="{{ g.issue_date }}"
+                                    data-enddate="{{ g.end_date }}"
+                                    data-status="{{ g.user_status }}"
+                                    data-bs-toggle="modal" data-bs-target="#editModal">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% if current_user.role == 'admin' %}
+                                <button class="btn btn-sm btn-outline-danger delete-btn" 
+                                    data-id="{{ g.id }}"
+                                    data-gno="{{ g.g_no }}"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                                 {% endif %}
                             </td>
                         </tr>
@@ -51,4 +130,286 @@
         </div>
     </div>
 </div>
+
+<!-- Add Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة ضمان جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_guarantee') }}" method="POST">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">رقم الضمان <span class="text-danger">*</span></label>
+                            <input type="text" name="g_no" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">البنك</label>
+                            <select name="bank" class="form-select">
+                                <option value="الراجحي">الراجحي</option>
+                                <option value="الأهلي">الأهلي</option>
+                                <option value="الرياض">الرياض</option>
+                                <option value="ساب">ساب</option>
+                                <option value="الإنماء">الإنماء</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">نوع الضمان</label>
+                            <select name="g_type" class="form-select">
+                                <option value="ابتدائي">ابتدائي</option>
+                                <option value="نهائي">نهائي</option>
+                                <option value="دفعة مقدمة">دفعة مقدمة</option>
+                                <option value="مالي">مالي</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">المبلغ</label>
+                            <input type="number" step="0.01" name="amount" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">المستفيد</label>
+                            <input type="text" name="beneficiary" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">اسم المشروع</label>
+                            <input type="text" name="project_name" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تاريخ الإصدار</label>
+                            <input type="date" name="issue_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تاريخ الانتهاء</label>
+                            <input type="date" name="end_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">القسم</label>
+                            <input type="text" name="department" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">الحالة</label>
+                            <select name="user_status" class="form-select">
+                                <option value="ساري" selected>ساري</option>
+                                <option value="منتهي">منتهي</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">حفظ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تعديل ضمان</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm" method="POST">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">رقم الضمان</label>
+                            <input type="text" name="g_no" id="edit_g_no" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">البنك</label>
+                            <select name="bank" id="edit_bank" class="form-select">
+                                <option value="الراجحي">الراجحي</option>
+                                <option value="الأهلي">الأهلي</option>
+                                <option value="الرياض">الرياض</option>
+                                <option value="ساب">ساب</option>
+                                <option value="الإنماء">الإنماء</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">نوع الضمان</label>
+                            <select name="g_type" id="edit_g_type" class="form-select">
+                                <option value="ابتدائي">ابتدائي</option>
+                                <option value="نهائي">نهائي</option>
+                                <option value="دفعة مقدمة">دفعة مقدمة</option>
+                                <option value="مالي">مالي</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">المبلغ</label>
+                            <input type="number" step="0.01" name="amount" id="edit_amount" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">المستفيد</label>
+                            <input type="text" name="beneficiary" id="edit_beneficiary" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">اسم المشروع</label>
+                            <input type="text" name="project_name" id="edit_project" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تاريخ الإصدار</label>
+                            <input type="date" name="issue_date" id="edit_issue_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">تاريخ الانتهاء</label>
+                            <input type="date" name="end_date" id="edit_end_date" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">القسم</label>
+                            <input type="text" name="department" id="edit_dept" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">الحالة</label>
+                            <select name="user_status" id="edit_status" class="form-select">
+                                <option value="ساري">ساري</option>
+                                <option value="منتهي">منتهي</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">تأكيد الحذف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                هل أنت متأكد من رغبتك في حذف الضمان رقم <strong id="delete_g_no"></strong>؟
+                <br>لا يمكن التراجع عن هذا الإجراء.
+            </div>
+            <div class="modal-footer">
+                <form id="deleteForm" method="POST">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">حذف</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Filter Logic
+    const searchInput = document.getElementById('searchInput');
+    const bankFilter = document.getElementById('bankFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    const tableBody = document.getElementById('tableBody');
+    const rowCount = document.getElementById('rowCount');
+
+    function filterTable() {
+        const searchText = searchInput.value.toLowerCase();
+        const bank = bankFilter.value;
+        const status = statusFilter.value;
+        const type = typeFilter.value;
+        
+        let visibleCount = 0;
+        const rows = tableBody.getElementsByTagName('tr');
+
+        for (let row of rows) {
+            const rowBank = row.getAttribute('data-bank') || '';
+            const rowStatus = row.getAttribute('data-status') || '';
+            const rowType = row.getAttribute('data-type') || '';
+            const rowSearch = row.getAttribute('data-search').toLowerCase();
+
+            const matchSearch = rowSearch.includes(searchText);
+            const matchBank = !bank || rowBank === bank;
+            const matchStatus = !status || rowStatus === status;
+            const matchType = !type || rowType === type;
+
+            if (matchSearch && matchBank && matchStatus && matchType) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        }
+        rowCount.textContent = visibleCount + ' ضمان';
+    }
+
+    searchInput.addEventListener('keyup', filterTable);
+    bankFilter.addEventListener('change', filterTable);
+    statusFilter.addEventListener('change', filterTable);
+    typeFilter.addEventListener('change', filterTable);
+
+    // Edit Modal Logic
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const form = document.getElementById('editForm');
+            form.action = `/guarantees/edit/${id}`;
+            
+            document.getElementById('edit_g_no').value = this.dataset.gno;
+            document.getElementById('edit_bank').value = this.dataset.bank;
+            document.getElementById('edit_dept').value = this.dataset.dept;
+            document.getElementById('edit_g_type').value = this.dataset.type;
+            document.getElementById('edit_amount').value = this.dataset.amount;
+            document.getElementById('edit_beneficiary').value = this.dataset.beneficiary;
+            document.getElementById('edit_project').value = this.dataset.project;
+            document.getElementById('edit_issue_date').value = this.dataset.issuedate;
+            document.getElementById('edit_end_date').value = this.dataset.enddate;
+            document.getElementById('edit_status').value = this.dataset.status || 'ساري';
+        });
+    });
+
+    // Delete Modal Logic
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const gno = this.dataset.gno;
+            const form = document.getElementById('deleteForm');
+            form.action = `/guarantees/delete/${id}`;
+            document.getElementById('delete_g_no').textContent = gno;
+        });
+    });
+
+    // Export to Excel (Simple implementation)
+    function exportTableToExcel(tableID, filename = ''){
+        var downloadLink;
+        var dataType = 'application/vnd.ms-excel';
+        var tableSelect = document.getElementById(tableID);
+        var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+        
+        // Specify file name
+        filename = filename?filename+'.xls':'guarantees_data.xls';
+        
+        // Create download link element
+        downloadLink = document.createElement("a");
+        
+        document.body.appendChild(downloadLink);
+        
+        if(navigator.msSaveOrOpenBlob){
+            var blob = new Blob(['\ufeff', tableHTML], {
+                type: dataType
+            });
+            navigator.msSaveOrOpenBlob( blob, filename);
+        }else{
+            // Create a link to the file
+            downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+        
+            // Setting the file name
+            downloadLink.download = filename;
+            
+            //triggering the function
+            downloadLink.click();
+        }
+    }
+</script>
 {% endblock %}

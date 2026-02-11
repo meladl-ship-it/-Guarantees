@@ -1026,11 +1026,16 @@ def index_logic(view_type='dashboard'):
         # === تحضير البيانات ===
         
         active_rows = []
+        processed_rows = []
         today = datetime.now()
         today = datetime(today.year, today.month, today.day) # Strip time for accurate day calculation
         today_str = today.strftime('%Y-%m-%d')
         
         for r in rows:
+            # تحويل الصف إلى قاموس قابل للتعديل إذا لزم الأمر
+            if not isinstance(r, dict):
+                r = dict(r)
+
             # تطبيع الحالة: تحويل القيمة الفارغة إلى نص فارغ
             raw_status = (r.get('user_status') or '').strip()
             # استبعاد الضمانات النقدية (cash_flag = 1) بناء على طلب المستخدم
@@ -1038,40 +1043,42 @@ def index_logic(view_type='dashboard'):
             
             # تحديد الحالة
             is_expired = (raw_status == 'منتهي')
-            is_pending = (raw_status == 'انتهى في انتظار التأكيد')
             
-            # الشرط: نستبعد 'منتهي' فقط، ونشمل الكل (نقدي، ساري، غير مسجل، انتظار تأكيد)
+            # منطق تحديد الحالة للعرض (Status Chart & Table)
+            display_status = raw_status
+            
+            # 1. معالجة الحالة الفارغة أو 'ساري' للتحقق من "قارب على الانتهاء"
+            if display_status == '' or display_status == 'ساري':
+                display_status = 'ساري' # الافتراضي
+                
+                end_date_str = r.get('end_date')
+                if end_date_str:
+                    try:
+                        # محاولة تحليل التاريخ (المتوقع yyyy-MM-dd)
+                        end_date = datetime.strptime(str(end_date_str), '%Y-%m-%d')
+                        days_left = (end_date - today).days
+                        
+                        # منطق قارب على الانتهاء: متبقي 30 يوم أو أقل (وليس منتهي)
+                        if 0 <= days_left <= 30:
+                            display_status = 'قارب على الانتهاء'
+                        # منطق انتهى في انتظار التأكيد (ضمني): التاريخ انتهى ولكن الحالة لم تُحدث
+                        elif days_left < 0:
+                            display_status = 'انتهى في انتظار التأكيد'
+                    except:
+                        pass # في حال فشل تحليل التاريخ، يبقى 'ساري'
+            
+            # 2. ضمان أن 'ضمان غير مسجل' يظهر كما هو
+            elif display_status == 'ضمان غير مسجل':
+                pass 
+                
+            # تخزين الحالة المحسوبة للعرض
+            r['display_status'] = display_status
+            
+            # إضافة للصفوف المعالجة (للجدول)
+            processed_rows.append(r)
+
+            # الشرط: نستبعد 'منتهي' فقط، ونشمل الكل (نقدي، ساري، غير مسجل، انتظار تأكيد) للإحصائيات
             if not is_expired:
-                
-                # منطق تحديد الحالة للعرض (Status Chart)
-                display_status = raw_status
-                
-                # 1. معالجة الحالة الفارغة أو 'ساري' للتحقق من "قارب على الانتهاء"
-                if display_status == '' or display_status == 'ساري':
-                    display_status = 'ساري' # الافتراضي
-                    
-                    end_date_str = r.get('end_date')
-                    if end_date_str:
-                        try:
-                            # محاولة تحليل التاريخ (المتوقع yyyy-MM-dd)
-                            end_date = datetime.strptime(str(end_date_str), '%Y-%m-%d')
-                            days_left = (end_date - today).days
-                            
-                            # منطق قارب على الانتهاء: متبقي 30 يوم أو أقل (وليس منتهي)
-                            if 0 <= days_left <= 30:
-                                display_status = 'قارب على الانتهاء'
-                            # منطق انتهى في انتظار التأكيد (ضمني): التاريخ انتهى ولكن الحالة لم تُحدث
-                            elif days_left < 0:
-                                display_status = 'انتهى في انتظار التأكيد'
-                        except:
-                            pass # في حال فشل تحليل التاريخ، يبقى 'ساري'
-                
-                # 2. ضمان أن 'ضمان غير مسجل' يظهر كما هو
-                elif display_status == 'ضمان غير مسجل':
-                    pass 
-                    
-                # تخزين الحالة المحسوبة للعرض
-                r['display_status'] = display_status
                 active_rows.append(r)
         
         # 2. الإجماليات الرئيسية
@@ -1081,7 +1088,7 @@ def index_logic(view_type='dashboard'):
         
         if view_type == 'table':
             return render_template('table.html', 
-                                 guarantees=rows, 
+                                 guarantees=processed_rows, 
                                  today_date=today_str)
 
         # === منطق لوحة الإحصائيات ===
@@ -1345,6 +1352,142 @@ def download_report(dept_name):
         print(f"Error generating report: {e}")
         flash(f'حدث خطأ أثناء إنشاء التقرير: {e}', 'danger')
         return redirect(url_for('reports'))
+
+# === إدارة الضمانات (إضافة/تعديل/حذف) ===
+
+@app.route('/guarantees/add', methods=['POST'])
+@login_required
+def add_guarantee():
+    try:
+        # استلام البيانات من النموذج
+        data = request.form
+        
+        g_no = data.get('g_no')
+        if not g_no:
+            flash('رقم الضمان مطلوب', 'warning')
+            return redirect(url_for('data_table'))
+
+        bank = data.get('bank')
+        department = data.get('department')
+        g_type = data.get('g_type')
+        amount = data.get('amount')
+        beneficiary = data.get('beneficiary')
+        project_name = data.get('project_name')
+        issue_date = data.get('issue_date')
+        end_date = data.get('end_date')
+        user_status = data.get('user_status', 'ساري')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # التحقق من تكرار رقم الضمان
+        try:
+            # استعلام الإدخال
+            query = """
+                INSERT INTO guarantees (
+                    g_no, bank, department, g_type, amount, beneficiary, 
+                    project_name, issue_date, end_date, user_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            # تعديل الاستعلام لـ Postgres
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                query = query.replace('?', '%s')
+                
+            cursor.execute(query, (
+                g_no, bank, department, g_type, amount, beneficiary, 
+                project_name, issue_date, end_date, user_status
+            ))
+            
+            conn.commit()
+            conn.close()
+            flash('تم إضافة الضمان بنجاح', 'success')
+            
+        except sqlite3.IntegrityError:
+            conn.close()
+            flash('رقم الضمان موجود بالفعل', 'danger')
+        except psycopg2.errors.UniqueViolation:
+            conn.rollback()
+            conn.close()
+            flash('رقم الضمان موجود بالفعل', 'danger')
+            
+    except Exception as e:
+        print(f"Error adding guarantee: {e}")
+        flash('حدث خطأ أثناء إضافة الضمان', 'danger')
+        
+    return redirect(url_for('data_table'))
+
+@app.route('/guarantees/edit/<int:id>', methods=['POST'])
+@login_required
+def edit_guarantee(id):
+    try:
+        data = request.form
+        
+        # الحقول القابلة للتعديل
+        g_no = data.get('g_no')
+        bank = data.get('bank')
+        department = data.get('department')
+        g_type = data.get('g_type')
+        amount = data.get('amount')
+        beneficiary = data.get('beneficiary')
+        project_name = data.get('project_name')
+        issue_date = data.get('issue_date')
+        end_date = data.get('end_date')
+        user_status = data.get('user_status')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        query = """
+            UPDATE guarantees SET 
+                g_no=?, bank=?, department=?, g_type=?, amount=?, 
+                beneficiary=?, project_name=?, issue_date=?, end_date=?, user_status=?
+            WHERE id=?
+        """
+        
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            query = query.replace('?', '%s')
+            
+        cursor.execute(query, (
+            g_no, bank, department, g_type, amount, beneficiary, 
+            project_name, issue_date, end_date, user_status, id
+        ))
+        
+        conn.commit()
+        conn.close()
+        flash('تم تحديث الضمان بنجاح', 'success')
+        
+    except Exception as e:
+        print(f"Error editing guarantee: {e}")
+        flash('حدث خطأ أثناء تحديث الضمان', 'danger')
+        
+    return redirect(url_for('data_table'))
+
+@app.route('/guarantees/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_guarantee(id):
+    if current_user.role != 'admin':
+        flash('غير مصرح لك بالحذف', 'danger')
+        return redirect(url_for('data_table'))
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        query = "DELETE FROM guarantees WHERE id=?"
+        if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+            query = query.replace('?', '%s')
+            
+        cursor.execute(query, (id,))
+        conn.commit()
+        conn.close()
+        flash('تم حذف الضمان بنجاح', 'success')
+        
+    except Exception as e:
+        print(f"Error deleting guarantee: {e}")
+        flash('حدث خطأ أثناء حذف الضمان', 'danger')
+        
+    return redirect(url_for('data_table'))
 
 if __name__ == '__main__':
     print("جاري تشغيل الموقع...")
