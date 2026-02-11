@@ -1377,6 +1377,13 @@ def add_guarantee():
         end_date = data.get('end_date')
         user_status = data.get('user_status', 'ساري')
         
+        # New fields
+        insurance_amount = data.get('insurance_amount')
+        percent = data.get('percent')
+        requester = data.get('requester')
+        notes = data.get('notes')
+        entry_number = data.get('entry_number')
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -1386,8 +1393,9 @@ def add_guarantee():
             query = """
                 INSERT INTO guarantees (
                     g_no, bank, department, g_type, amount, beneficiary, 
-                    project_name, issue_date, end_date, user_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    project_name, issue_date, end_date, user_status,
+                    insurance_amount, percent, requester, notes, entry_number
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             
             # تعديل الاستعلام لـ Postgres
@@ -1396,7 +1404,8 @@ def add_guarantee():
                 
             cursor.execute(query, (
                 g_no, bank, department, g_type, amount, beneficiary, 
-                project_name, issue_date, end_date, user_status
+                project_name, issue_date, end_date, user_status,
+                insurance_amount, percent, requester, notes, entry_number
             ))
             
             conn.commit()
@@ -1435,13 +1444,21 @@ def edit_guarantee(id):
         end_date = data.get('end_date')
         user_status = data.get('user_status')
         
+        # New fields
+        insurance_amount = data.get('insurance_amount')
+        percent = data.get('percent')
+        requester = data.get('requester')
+        notes = data.get('notes')
+        entry_number = data.get('entry_number')
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
         query = """
             UPDATE guarantees SET 
                 g_no=?, bank=?, department=?, g_type=?, amount=?, 
-                beneficiary=?, project_name=?, issue_date=?, end_date=?, user_status=?
+                beneficiary=?, project_name=?, issue_date=?, end_date=?, user_status=?,
+                insurance_amount=?, percent=?, requester=?, notes=?, entry_number=?
             WHERE id=?
         """
         
@@ -1450,7 +1467,8 @@ def edit_guarantee(id):
             
         cursor.execute(query, (
             g_no, bank, department, g_type, amount, beneficiary, 
-            project_name, issue_date, end_date, user_status, id
+            project_name, issue_date, end_date, user_status,
+            insurance_amount, percent, requester, notes, entry_number, id
         ))
         
         conn.commit()

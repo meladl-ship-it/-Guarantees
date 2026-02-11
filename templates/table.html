@@ -64,10 +64,16 @@
                             <th>البنك</th>
                             <th>النوع</th>
                             <th>المبلغ</th>
+                            <th>الغطاء</th>
+                            <th>النسبة</th>
                             <th>المستفيد</th>
+                            <th>المشروع</th>
+                            <th>طالب الضمان</th>
                             <th>تاريخ الإصدار</th>
                             <th>تاريخ الانتهاء</th>
                             <th>القسم</th>
+                            <th>ملاحظات</th>
+                            <th>رقم القيد</th>
                             <th>الحالة</th>
                             <th>إجراءات</th>
                         </tr>
@@ -75,15 +81,21 @@
                     <tbody id="tableBody">
                         {% for g in guarantees %}
                         <tr data-bank="{{ g.bank }}" data-status="{{ g.display_status }}" data-type="{{ g.g_type }}" 
-                            data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }} {{ g.amount }}">
+                            data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }} {{ g.amount }} {{ g.requester }} {{ g.notes }} {{ g.entry_number }}">
                             <td class="fw-bold text-primary">{{ g.g_no }}</td>
                             <td>{{ g.bank }}</td>
                             <td><span class="badge bg-light text-dark border">{{ g.g_type }}</span></td>
                             <td class="font-monospace fw-bold">{{ "{:,.2f}".format(g.amount) if g.amount else '0.00' }}</td>
+                            <td class="font-monospace">{{ "{:,.2f}".format(g.insurance_amount) if g.insurance_amount else '0.00' }}</td>
+                            <td class="font-monospace">{{ "{:,.2f}".format(g.percent) if g.percent else '0.00' }}%</td>
                             <td class="text-truncate" style="max-width: 150px;" title="{{ g.beneficiary }}">{{ g.beneficiary }}</td>
+                            <td class="text-truncate" style="max-width: 150px;" title="{{ g.project_name }}">{{ g.project_name }}</td>
+                            <td class="text-truncate" style="max-width: 100px;" title="{{ g.requester }}">{{ g.requester }}</td>
                             <td>{{ g.issue_date }}</td>
                             <td>{{ g.end_date }}</td>
                             <td>{{ g.department }}</td>
+                            <td class="text-truncate" style="max-width: 100px;" title="{{ g.notes }}">{{ g.notes }}</td>
+                            <td>{{ g.entry_number }}</td>
                             <td>
                                 {% if g.display_status == 'ساري' %}
                                     <span class="badge bg-success">ساري</span>
@@ -105,11 +117,16 @@
                                     data-dept="{{ g.department }}"
                                     data-type="{{ g.g_type }}"
                                     data-amount="{{ g.amount }}"
+                                    data-insurance="{{ g.insurance_amount }}"
+                                    data-percent="{{ g.percent }}"
                                     data-beneficiary="{{ g.beneficiary }}"
                                     data-project="{{ g.project_name }}"
+                                    data-requester="{{ g.requester }}"
                                     data-issuedate="{{ g.issue_date }}"
                                     data-enddate="{{ g.end_date }}"
                                     data-status="{{ g.user_status }}"
+                                    data-notes="{{ g.notes }}"
+                                    data-entry="{{ g.entry_number }}"
                                     data-bs-toggle="modal" data-bs-target="#editModal">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -169,13 +186,25 @@
                             <label class="form-label">المبلغ</label>
                             <input type="number" step="0.01" name="amount" class="form-control">
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label">الغطاء (مبلغ التأمين)</label>
+                            <input type="number" step="0.01" name="insurance_amount" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">النسبة %</label>
+                            <input type="number" step="0.01" name="percent" class="form-control">
+                        </div>
                         <div class="col-md-12">
                             <label class="form-label">المستفيد</label>
                             <input type="text" name="beneficiary" class="form-control">
                         </div>
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                             <label class="form-label">اسم المشروع</label>
                             <input type="text" name="project_name" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">طالب الضمان</label>
+                            <input type="text" name="requester" class="form-control">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">تاريخ الإصدار</label>
@@ -188,6 +217,14 @@
                         <div class="col-md-6">
                             <label class="form-label">القسم</label>
                             <input type="text" name="department" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">رقم القيد</label>
+                            <input type="text" name="entry_number" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">ملاحظات</label>
+                            <textarea name="notes" class="form-control" rows="2"></textarea>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">الحالة</label>
@@ -245,13 +282,25 @@
                             <label class="form-label">المبلغ</label>
                             <input type="number" step="0.01" name="amount" id="edit_amount" class="form-control">
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label">الغطاء</label>
+                            <input type="number" step="0.01" name="insurance_amount" id="edit_insurance" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">النسبة %</label>
+                            <input type="number" step="0.01" name="percent" id="edit_percent" class="form-control">
+                        </div>
                         <div class="col-md-12">
                             <label class="form-label">المستفيد</label>
                             <input type="text" name="beneficiary" id="edit_beneficiary" class="form-control">
                         </div>
-                        <div class="col-md-12">
+                        <div class="col-md-6">
                             <label class="form-label">اسم المشروع</label>
                             <input type="text" name="project_name" id="edit_project" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">طالب الضمان</label>
+                            <input type="text" name="requester" id="edit_requester" class="form-control">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">تاريخ الإصدار</label>
@@ -264,6 +313,14 @@
                         <div class="col-md-6">
                             <label class="form-label">القسم</label>
                             <input type="text" name="department" id="edit_dept" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">رقم القيد</label>
+                            <input type="text" name="entry_number" id="edit_entry" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">ملاحظات</label>
+                            <textarea name="notes" id="edit_notes" class="form-control" rows="2"></textarea>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">الحالة</label>
@@ -378,11 +435,16 @@
             document.getElementById('edit_dept').value = this.dataset.dept;
             document.getElementById('edit_g_type').value = this.dataset.type;
             document.getElementById('edit_amount').value = this.dataset.amount;
+            document.getElementById('edit_insurance').value = this.dataset.insurance;
+            document.getElementById('edit_percent').value = this.dataset.percent;
             document.getElementById('edit_beneficiary').value = this.dataset.beneficiary;
             document.getElementById('edit_project').value = this.dataset.project;
+            document.getElementById('edit_requester').value = this.dataset.requester;
             document.getElementById('edit_issue_date').value = this.dataset.issuedate;
             document.getElementById('edit_end_date').value = this.dataset.enddate;
             document.getElementById('edit_status').value = this.dataset.status || 'ساري';
+            document.getElementById('edit_notes').value = this.dataset.notes;
+            document.getElementById('edit_entry').value = this.dataset.entry;
         });
     });
 
