@@ -222,7 +222,9 @@ def sync_data():
         print(f"Error ensuring DB in sync: {e}")
 
     api_key = request.headers.get('X-API-Key')
-    if api_key != os.environ.get('API_KEY'):
+    # Use fallback API key if not set in environment (matches local .env default)
+    server_key = os.environ.get('API_KEY', 'bb16e983-3950-4b9a-8aa0-a7f9d0f2ac32')
+    if api_key != server_key:
         return json.dumps({'error': 'Unauthorized'}), 401
 
     data = request.json

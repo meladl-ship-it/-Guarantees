@@ -13368,6 +13368,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # Import cloud_sync module dynamically to avoid circular imports or early errors
             try:
                 import cloud_sync
+                import importlib
+                importlib.reload(cloud_sync)
             except ImportError:
                 # If file not in path, try adding current dir
                 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

@@ -20,7 +20,14 @@ def load_env():
 
 load_env()
 
-CLOUD_URL = os.environ.get("CLOUD_SYNC_URL", "http://127.0.0.1:5000/api/sync")
+# Default to Railway URL if not found in env
+DEFAULT_CLOUD_URL = "https://web-gun.up.railway.app/api/sync"
+CLOUD_URL = os.environ.get("CLOUD_SYNC_URL", DEFAULT_CLOUD_URL)
+# If for some reason it's still pointing to localhost (e.g. env var set elsewhere), force it if it's the default localhost
+if "127.0.0.1" in CLOUD_URL or "localhost" in CLOUD_URL:
+    print(f"Warning: CLOUD_URL was {CLOUD_URL}, switching to production default.")
+    CLOUD_URL = DEFAULT_CLOUD_URL
+
 API_KEY = os.environ.get("API_KEY", "bb16e983-3950-4b9a-8aa0-a7f9d0f2ac32")
 
 def sync_to_cloud(progress_callback=None):
@@ -30,7 +37,7 @@ def sync_to_cloud(progress_callback=None):
     """
     try:
         if progress_callback:
-            progress_callback("جاري الاتصال بقاعدة البيانات المحلية...")
+            progress_callback(f"جاري الاتصال بالسحابة ({CLOUD_URL})...")
             
         conn = connect_db()
         # Ensure we are using sqlite3 row factory or dict conversion
@@ -99,7 +106,7 @@ def sync_to_cloud(progress_callback=None):
             return False, err
             
     except Exception as e:
-        err = f"فشل الاتصال: {str(e)}"
+        err = f"فشل الاتصال ({CLOUD_URL}): {str(e)}"
         if progress_callback:
             progress_callback(err)
         return False, err
