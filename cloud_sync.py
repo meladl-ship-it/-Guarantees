@@ -90,10 +90,33 @@ def sync_to_cloud(progress_callback=None):
             h = u.get('password_hash', '')
             print(f" - User: {u.get('username')}, Role: {u.get('role')}, Hash Prefix: {h[:20]}...")
 
-        if progress_callback:
-            progress_callback(f"تم قراءة {len(data)} ضمان و {len(users_data)} مستخدم. جاري الرفع للسحابة...")
+        # === Fetch Bank Limits ===
+        conn = connect_db()
+        try:
+            conn.row_factory = sqlite3.Row
+        except:
+            pass
             
-        payload = {"guarantees": data, "users": users_data}
+        cursor = conn.cursor()
+        bank_limits_data = []
+        try:
+            cursor.execute("SELECT * FROM bank_limits")
+            bl_rows = cursor.fetchall()
+            
+            if bl_rows and isinstance(bl_rows[0], sqlite3.Row):
+                bank_limits_data = [dict(row) for row in bl_rows]
+            elif bl_rows:
+                cols = [c[0] for c in cursor.description]
+                bank_limits_data = [dict(zip(cols, row)) for row in bl_rows]
+        except Exception as e:
+            print(f"Warning reading bank_limits: {e}")
+            
+        conn.close()
+
+        if progress_callback:
+            progress_callback(f"تم قراءة {len(data)} ضمان و {len(users_data)} مستخدم و {len(bank_limits_data)} حد بنكي. جاري الرفع للسحابة...")
+            
+        payload = {"guarantees": data, "users": users_data, "bank_limits": bank_limits_data}
         headers = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
         
         # Use a longer timeout for large data
