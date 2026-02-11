@@ -65,7 +65,7 @@ class User(UserMixin):
             user = cursor.fetchone()
             conn.close()
             if user:
-                return User(id=user['id'], username=user['username'], email=user['email'], role=user['role'])
+                return User(id=user['id'], username=user['username'], email=user.get('email'), role=user.get('role', 'user'))
         except Exception as e:
             print(f"Error fetching user: {e}")
         return None
@@ -86,7 +86,7 @@ class User(UserMixin):
             conn.close()
             
             if user:
-                return User(id=user['id'], username=user['username'], email=user['email'], role=user['role'])
+                return User(id=user['id'], username=user['username'], email=user.get('email'), role=user.get('role', 'user'))
         except Exception as e:
             print(f"Error fetching user by email: {e}")
         return None
@@ -186,6 +186,19 @@ def debug_info():
 def welcome():
     return render_template('welcome.html', user=current_user)
 
+import hashlib
+
+def check_legacy_hash(stored_hash, password):
+    # Try simple SHA256 (common in older systems)
+    try:
+        if len(stored_hash) == 64:
+            # Assume SHA256
+            if hashlib.sha256(password.encode()).hexdigest() == stored_hash:
+                return True
+    except:
+        pass
+    return False
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -197,8 +210,20 @@ def login():
         
         user_data = User.get_by_username(username)
         
-        if user_data and user_data.get('password_hash') and check_password_hash(user_data['password_hash'], password):
-            user = User(id=user_data['id'], username=user_data['username'], email=user_data['email'], role=user_data['role'])
+        valid_login = False
+        if user_data and user_data.get('password_hash'):
+            # Try standard Werkzeug hash
+            if check_password_hash(user_data['password_hash'], password):
+                valid_login = True
+            # Fallback for legacy hashes (e.g. raw SHA256)
+            elif check_legacy_hash(user_data['password_hash'], password):
+                valid_login = True
+                
+        if valid_login:
+            user = User(id=user_data['id'], 
+                       username=user_data['username'], 
+                       email=user_data.get('email'), 
+                       role=user_data.get('role', 'user'))
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
@@ -289,7 +314,7 @@ def sync_data():
                 # Truncate users table (careful: this logs out everyone if session depends on DB state, but usually session is cookie based)
                 cursor.execute("TRUNCATE TABLE users RESTART IDENTITY")
                 
-                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active"]
+                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active", "email"]
                 # Filter columns that exist in the target schema if needed, but we assume schema parity via db_adapter
                 
                 cols_str = ", ".join([f'"{c}"' for c in user_columns])
@@ -331,7 +356,7 @@ def sync_data():
             if users_list:
                 cursor.execute("DELETE FROM users")
                 
-                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active"]
+                user_columns = ["id", "username", "password_hash", "pass_hash", "role", "active", "email"]
                 
                 cols_str = ", ".join([f'"{c}"' for c in user_columns])
                 vals_str = ", ".join(["?"] * len(user_columns))

@@ -210,7 +210,8 @@ def ensure_db():
                 password_hash TEXT,
                 pass_hash TEXT,
                 role TEXT DEFAULT 'user',
-                active INTEGER DEFAULT 1
+                active INTEGER DEFAULT 1,
+                email TEXT
             )"""
         )
         
@@ -271,6 +272,11 @@ def ensure_db():
                 if "notes" not in cols:
                     c.execute("ALTER TABLE attachments ADD COLUMN notes TEXT")
                     
+                # Users columns
+                cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
+                if "email" not in cols:
+                    c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+
                 conn.commit()
             except Exception:
                 pass
