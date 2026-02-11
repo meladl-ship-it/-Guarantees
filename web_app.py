@@ -252,8 +252,6 @@ def login():
             login_attempts_log.pop(0)
 
         if valid_login:
-                
-        if valid_login:
             user = User(id=user_data['id'], 
                        username=user_data['username'], 
                        email=user_data.get('email'), 
