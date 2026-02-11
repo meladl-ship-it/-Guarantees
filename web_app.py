@@ -22,6 +22,24 @@ from db_adapter import db_path, connect_db, normalize_query, PSYCOPG2_AVAILABLE,
 ensure_db()
 check_and_migrate_db()
 
+# --- Auto-fix: Ensure admin has the correct email ---
+try:
+    conn = connect_db()
+    cursor = conn.cursor()
+    # Check if we are on Postgres or SQLite
+    if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+        # Postgres
+        cursor.execute("UPDATE users SET email = %s WHERE username = 'admin'", ('m.eladl@abs-haj.com',))
+    else:
+        # SQLite
+        cursor.execute("UPDATE users SET email = ? WHERE username = 'admin'", ('m.eladl@abs-haj.com',))
+    conn.commit()
+    conn.close()
+    print(">>> SYSTEM: Admin email updated to m.eladl@abs-haj.com")
+except Exception as e:
+    print(f">>> SYSTEM WARNING: Could not update admin email: {e}")
+# ----------------------------------------------------
+
 if PSYCOPG2_AVAILABLE:
     import psycopg2.extras
 
