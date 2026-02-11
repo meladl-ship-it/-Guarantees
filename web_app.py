@@ -509,25 +509,18 @@ def sync_data():
             
             # --- Sync Users ---
             if users_list:
-                # Instead of truncating, we use UPSERT (Insert or Update) based on username
-                # This preserves users created on the Web App that are not present in Desktop App
+                # Instead of updating existing users, we only insert NEW users.
+                # If a user already exists (by username), we DO NOTHING (preserve their current state).
                 
-                # Exclude 'id' from sync to avoid Primary Key collisions between Web-created and Desktop-created users.
-                # We match by 'username'.
                 user_columns = ["username", "password_hash", "pass_hash", "role", "active", "email"]
                 
                 cols_str = ", ".join([f'"{c}"' for c in user_columns])
                 vals_str = ", ".join(["%s"] * len(user_columns))
                 
-                # Postgres UPSERT syntax
+                # Postgres INSERT ON CONFLICT DO NOTHING
                 query = f"""
                     INSERT INTO users ({cols_str}) VALUES ({vals_str})
-                    ON CONFLICT (username) DO UPDATE SET
-                    password_hash = EXCLUDED.password_hash,
-                    pass_hash = EXCLUDED.pass_hash,
-                    role = EXCLUDED.role,
-                    active = EXCLUDED.active,
-                    email = EXCLUDED.email
+                    ON CONFLICT (username) DO NOTHING
                 """
                 
                 for u in users_list:
@@ -582,40 +575,29 @@ def sync_data():
             
             # --- Sync Users ---
             if users_list:
-                # SQLite Upsert (INSERT OR REPLACE)
-                # Note: REPLACE deletes the old row and inserts a new one, changing the ID if not specified.
-                # To preserve IDs of existing rows we match by username, we should check existence or use UPSERT syntax if SQLite version >= 3.24.
-                # Assuming standard SQLite, we'll try INSERT OR REPLACE but without ID to let it autoincrement? 
-                # No, if we don't provide ID and use REPLACE, it creates a new row.
-                # Since SQLite support is mainly for local dev/testing, we can try to be smart.
-                # However, for simplicity and to match Postgres behavior logic (preserve web users), we should NOT delete all users.
+                # SQLite Logic: Insert New Only (Ignore Existing)
                 
-                # First, get existing users to map username -> id
-                cursor.execute("SELECT id, username FROM users")
-                existing_users = {row[1]: row[0] for row in cursor.fetchall()}
+                # First, get existing usernames to skip them
+                cursor.execute("SELECT username FROM users")
+                existing_usernames = {row[0] for row in cursor.fetchall()}
                 
                 user_columns = ["username", "password_hash", "pass_hash", "role", "active", "email"]
+                cols_str = ", ".join([f'"{c}"' for c in user_columns])
+                vals_str = ", ".join(["?"] * len(user_columns))
+                
+                query = f"INSERT INTO users ({cols_str}) VALUES ({vals_str})"
                 
                 for u in users_list:
                     username = u.get('username')
                     if not username: continue
                     
-                    if username in existing_users:
-                        # Update
-                        uid = existing_users[username]
-                        # We don't update ID, just other fields
-                        update_cols = ["password_hash", "pass_hash", "role", "active", "email"]
-                        set_clause = ", ".join([f'"{c}" = ?' for c in update_cols])
-                        vals = [u.get(c) for c in update_cols]
-                        vals.append(uid)
-                        cursor.execute(f"UPDATE users SET {set_clause} WHERE id = ?", tuple(vals))
+                    if username in existing_usernames:
+                        continue # Skip existing user
                     else:
-                        # Insert
-                        cols_str = ", ".join([f'"{c}"' for c in user_columns])
-                        vals_str = ", ".join(["?"] * len(user_columns))
+                        # Insert new user
                         vals = tuple(u.get(c) for c in user_columns)
-                        cursor.execute(f"INSERT INTO users ({cols_str}) VALUES ({vals_str})", vals)
-                    
+                        cursor.execute(query, vals)
+                     
             # --- Sync Bank Limits ---
             if bank_limits_list:
                 # Ensure table exists
