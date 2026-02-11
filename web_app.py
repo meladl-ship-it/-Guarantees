@@ -375,20 +375,32 @@ def forgot_password():
         
         target_user = user_by_name or user_by_email
         
-        if target_user and target_user.get('email'):
+        # Normalize target_user to dict for easier handling
+        target_email = None
+        target_username = None
+        
+        if target_user:
+            if isinstance(target_user, dict):
+                target_email = target_user.get('email')
+                target_username = target_user.get('username')
+            else:
+                target_email = getattr(target_user, 'email', None)
+                target_username = getattr(target_user, 'username', None)
+
+        if target_user and target_email:
             try:
                 # Debug info
-                print(f"Attempting to send email to: {target_user['email']}")
+                print(f"Attempting to send email to: {target_email}")
                 print(f"SMTP Config: Server={app.config['MAIL_SERVER']}, Port={app.config['MAIL_PORT']}, TLS={app.config['MAIL_USE_TLS']}, User={app.config['MAIL_USERNAME']}")
                 
                 # Generate Token
-                token = serializer.dumps(target_user['email'], salt='password-reset-salt')
+                token = serializer.dumps(target_email, salt='password-reset-salt')
                 reset_url = url_for('reset_password', token=token, _external=True)
                 
                 # Send Email
-                msg = Message("إعادة تعيين كلمة المرور - نظام الضمانات", recipients=[target_user['email']])
+                msg = Message("إعادة تعيين كلمة المرور - نظام الضمانات", recipients=[target_email])
                 msg.body = f"""
-                مرحباً {target_user['username']}،
+                مرحباً {target_username}،
                 
                 لقد طلبت إعادة تعيين كلمة المرور الخاصة بك.
                 الرجاء الضغط على الرابط التالي لتعيين كلمة مرور جديدة:
@@ -409,8 +421,8 @@ def forgot_password():
             # Debugging: tell user why it failed
             if not target_user:
                 flash(f'لم يتم العثور على مستخدم بالبيانات المدخلة: {identifier}', 'warning')
-            elif not target_user.get('email'):
-                flash(f'المستخدم {target_user["username"]} موجود ولكن ليس لديه بريد إلكتروني مسجل.', 'warning')
+            elif not target_email:
+                flash(f'المستخدم {target_username or identifier} موجود ولكن ليس لديه بريد إلكتروني مسجل.', 'warning')
             
         return redirect(url_for('forgot_password'))
         
