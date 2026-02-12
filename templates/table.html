@@ -39,6 +39,14 @@
                     </select>
                 </div>
                 <div class="col-md-3 text-end">
+                    <div class="dropdown d-inline-block me-1">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="columnToggleBtn" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-columns"></i> الأعمدة
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2" aria-labelledby="columnToggleBtn" id="columnToggleList" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Column toggles will be generated here -->
+                        </ul>
+                    </div>
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
                         <i class="fas fa-plus me-1"></i> إضافة ضمان
                     </button>
@@ -567,6 +575,74 @@
             };
             
             resizer.addEventListener('mousedown', mouseDownHandler);
+        });
+    });
+
+    // Column Visibility Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const table = document.getElementById('guaranteesTable');
+        const headers = table.querySelectorAll('thead th');
+        const toggleList = document.getElementById('columnToggleList');
+        const savedVisibility = JSON.parse(localStorage.getItem('guaranteesTableVisibility')) || {};
+
+        headers.forEach((th, index) => {
+            // Skip the "Actions" column (last one) from being hidden potentially, or keep it optional
+            // Let's allow hiding everything except maybe the first sequence number if desired, 
+            // but for safety, let's just list all.
+            
+            const text = th.innerText.trim();
+            if (!text && index !== 0) return; // Skip empty headers if any (except first which might be #)
+            
+            const isVisible = savedVisibility[index] !== false; // Default true
+            
+            // Apply initial visibility
+            if (!isVisible) {
+                th.style.display = 'none';
+                // Hide cells in body
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    if (row.cells[index]) row.cells[index].style.display = 'none';
+                });
+            }
+
+            const li = document.createElement('li');
+            li.className = 'dropdown-item-text';
+            li.innerHTML = `
+                <div class="form-check">
+                    <input class="form-check-input column-toggle" type="checkbox" value="${index}" id="colCheck${index}" ${isVisible ? 'checked' : ''}>
+                    <label class="form-check-label w-100 stretched-link" for="colCheck${index}">
+                        ${text || '#'}
+                    </label>
+                </div>
+            `;
+            toggleList.appendChild(li);
+        });
+
+        // Event delegation for toggles
+        toggleList.addEventListener('change', function(e) {
+            if (e.target.classList.contains('column-toggle')) {
+                const index = parseInt(e.target.value);
+                const isChecked = e.target.checked;
+                
+                // Toggle Header
+                headers[index].style.display = isChecked ? '' : 'none';
+                
+                // Toggle Cells
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    if (row.cells[index]) row.cells[index].style.display = isChecked ? '' : 'none';
+                });
+
+                // Save to localStorage
+                const currentVisibility = JSON.parse(localStorage.getItem('guaranteesTableVisibility')) || {};
+                currentVisibility[index] = isChecked;
+                localStorage.setItem('guaranteesTableVisibility', JSON.stringify(currentVisibility));
+            }
+        });
+        
+        // Prevent dropdown close on click inside
+        toggleList.addEventListener('click', function(e) {
+            e.stopPropagation();
         });
     });
 
