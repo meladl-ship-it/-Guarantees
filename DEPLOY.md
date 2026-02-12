@@ -10,7 +10,7 @@
 1. اذهب إلى [Railway.app](https://railway.app) وسجل الدخول بحساب GitHub الخاص بك.
 2. اضغط على زر **+ New Project**.
 3. اختر **Deploy from GitHub repo**.
-4. اختر المستودع (Repository) الخاص بهذا المشروع (`-Guarantees`).
+4. اختر المستودع (Repository) الخاص بالمشروع (قد يكون اسمه `-Guarantees` ما لم تقم بتغييره على GitHub).
 5. اضغط **Deploy Now**.
 
 ## 3. إضافة قاعدة البيانات (PostgreSQL)

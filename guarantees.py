@@ -15721,7 +15721,7 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
         super().__init__()
-        self.setWindowTitle(APP_TITLE)
+        self.setWindowTitle("Abu Sarhad - Guarantees Management")
         self.setLayoutDirection(QtCore.Qt.RightToLeft)
         self._splash_shown_once = False
         self.resize(1250, 760)
