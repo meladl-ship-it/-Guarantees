@@ -69,6 +69,8 @@
                     .table th, .table td {
                         text-align: center !important;
                         vertical-align: middle !important;
+                        white-space: normal !important; /* Force text wrapping */
+                        word-wrap: break-word; /* Ensure long words break */
                     }
                     .table th {
                         position: relative;
@@ -585,23 +587,29 @@
         const toggleList = document.getElementById('columnToggleList');
         const savedVisibility = JSON.parse(localStorage.getItem('guaranteesTableVisibility')) || {};
 
+        // Helper to set display with priority
+        const setDisplay = (element, visible) => {
+            if (visible) {
+                element.style.removeProperty('display');
+            } else {
+                element.style.setProperty('display', 'none', 'important');
+            }
+        };
+
         headers.forEach((th, index) => {
-            // Skip the "Actions" column (last one) from being hidden potentially, or keep it optional
-            // Let's allow hiding everything except maybe the first sequence number if desired, 
-            // but for safety, let's just list all.
-            
             const text = th.innerText.trim();
-            if (!text && index !== 0) return; // Skip empty headers if any (except first which might be #)
+            // Allow all columns to be toggled, even empty ones (like actions if icon only)
+            // But skip if it's completely empty and not index 0
+            if (!text && index !== 0 && !th.querySelector('i')) return; 
             
             const isVisible = savedVisibility[index] !== false; // Default true
             
             // Apply initial visibility
             if (!isVisible) {
-                th.style.display = 'none';
-                // Hide cells in body
+                setDisplay(th, false);
                 const rows = table.querySelectorAll('tbody tr');
                 rows.forEach(row => {
-                    if (row.cells[index]) row.cells[index].style.display = 'none';
+                    if (row.cells[index]) setDisplay(row.cells[index], false);
                 });
             }
 
@@ -611,7 +619,7 @@
                 <div class="form-check">
                     <input class="form-check-input column-toggle" type="checkbox" value="${index}" id="colCheck${index}" ${isVisible ? 'checked' : ''}>
                     <label class="form-check-label w-100 stretched-link" for="colCheck${index}">
-                        ${text || '#'}
+                        ${text || (index === 0 ? '#' : 'إجراءات')}
                     </label>
                 </div>
             `;
@@ -625,12 +633,12 @@
                 const isChecked = e.target.checked;
                 
                 // Toggle Header
-                headers[index].style.display = isChecked ? '' : 'none';
+                if (headers[index]) setDisplay(headers[index], isChecked);
                 
                 // Toggle Cells
                 const rows = table.querySelectorAll('tbody tr');
                 rows.forEach(row => {
-                    if (row.cells[index]) row.cells[index].style.display = isChecked ? '' : 'none';
+                    if (row.cells[index]) setDisplay(row.cells[index], isChecked);
                 });
 
                 // Save to localStorage
