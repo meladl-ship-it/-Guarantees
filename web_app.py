@@ -1082,12 +1082,33 @@ def index_logic(view_type='dashboard'):
         net_active_count = len(active_rows)
         net_total_amount = sum(r['amount'] for r in active_rows if r['amount'] is not None)
         
+        # تفصيل السارية (نقدي vs تسهيلات)
+        active_cash_rows = [r for r in active_rows if r.get('cash_flag') == 1]
+        active_credit_rows = [r for r in active_rows if r.get('cash_flag') != 1]
+        
+        active_cash_count = len(active_cash_rows)
+        active_cash_amount = sum(r['amount'] for r in active_cash_rows if r['amount'] is not None)
+        
+        active_credit_count = len(active_credit_rows)
+        active_credit_amount = sum(r['amount'] for r in active_credit_rows if r['amount'] is not None)
+        
         if view_type == 'table':
-            # تصفية الضمانات النقدية من العرض في الجدول (cash_flag = 1)
-            table_rows = [r for r in processed_rows if r.get('cash_flag') != 1]
+            # Pass all guarantees to table (filtering handled in UI)
+            table_rows = processed_rows
+            
+            # Extract unique values for filters (sorted)
+            departments = sorted(list(set(r.get('department') or '' for r in table_rows if r.get('department'))))
+            banks = sorted(list(set(r.get('bank') or '' for r in table_rows if r.get('bank'))))
+            statuses = sorted(list(set(r.get('display_status') or '' for r in table_rows if r.get('display_status'))))
+            g_types = sorted(list(set(r.get('g_type') or '' for r in table_rows if r.get('g_type'))))
+            
             return render_template('table.html', 
                                  guarantees=table_rows, 
-                                 today_date=today_str)
+                                 today_date=today_str,
+                                 departments=departments,
+                                 banks=banks,
+                                 statuses=statuses,
+                                 g_types=g_types)
 
         # === منطق لوحة الإحصائيات ===
         
@@ -1186,6 +1207,10 @@ def index_logic(view_type='dashboard'):
                              total_count=total_count,
                              net_active_count=net_active_count,
                              net_total_amount=net_total_amount,
+                             active_cash_count=active_cash_count,
+                             active_cash_amount=active_cash_amount,
+                             active_credit_count=active_credit_count,
+                             active_credit_amount=active_credit_amount,
                              near_expiry_count=near_expiry_count,
                              near_expiry_amount=near_expiry_amount,
                              pending_bank_count=pending_bank_count,

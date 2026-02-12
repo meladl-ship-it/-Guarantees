@@ -144,6 +144,31 @@
         .table-responsive::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+        
+        @media print {
+            .sidebar, .top-header, .filter-card, .btn, .dropdown, .modal, .resizer, .d-flex.justify-content-between.align-items-center.mb-4 {
+                display: none !important;
+            }
+            .main-wrapper {
+                margin-right: 0 !important;
+                width: 100% !important;
+            }
+            .container-fluid {
+                padding: 0 !important;
+            }
+            .table-responsive {
+                overflow: visible !important;
+            }
+            body {
+                background: white !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .table thead th {
+                background-color: #eee !important;
+                color: black !important;
+                background: none !important;
+            }
+        }
     </style>
 
     <!-- Header & Actions -->
@@ -172,49 +197,84 @@
         </div>
     </div>
 
-    <!-- Filters Toolbar -->
-    <div class="filter-card p-3 mb-4">
-        <div class="row g-3 align-items-center">
-            <div class="col-md-4">
-                <div class="input-group">
-                    <span class="input-group-text bg-transparent border-0 ps-3"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" id="searchInput" class="form-control border-0 bg-light" placeholder="بحث سريع (رقم الضمان، المستفيد، المشروع)...">
+    <!-- Filters Toolbar (Desktop App Style) -->
+    <div class="filter-card p-4 mb-4">
+        <form id="filterForm">
+            <div class="row g-3">
+                <!-- Row 1 -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold">القسم</label>
+                    <select id="deptFilter" class="form-select">
+                        <option value="">الكل</option>
+                        {% for d in departments %}
+                        <option value="{{ d }}">{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold">البنك</label>
+                    <select id="bankFilter" class="form-select">
+                        <option value="">الكل</option>
+                        {% for b in banks %}
+                        <option value="{{ b }}">{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted fw-bold">نقدي/تسهيلات</label>
+                    <select id="cashFilter" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="0" selected>تسهيلات</option> <!-- Default to Credit as per desktop behavior usually -->
+                        <option value="1">نقدي</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted fw-bold">بحث</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" id="searchInput" class="form-control border-start-0 bg-light" placeholder="بحث متعدد (مثال: G-100 * شركة أ)">
+                    </div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold">الحالة</label>
+                    <select id="statusFilter" class="form-select">
+                        <option value="">الكل</option>
+                        {% for s in statuses %}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted fw-bold">نوع الضمان</label>
+                    <select id="typeFilter" class="form-select">
+                        <option value="">الكل</option>
+                        {% for t in g_types %}
+                        <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Action Buttons Area -->
+                <div class="col-md-6 d-flex align-items-end justify-content-end gap-2">
+                    <!-- Tools (Settings, Stats, etc.) -->
+                     <div class="btn-group me-auto">
+                        <a href="{{ url_for('settings') }}" class="btn btn-light" title="الإعدادات"><i class="fas fa-cog"></i></a>
+                        <button type="button" class="btn btn-light" title="الإحصائيات" onclick="window.location.href='/dashboard'"><i class="fas fa-chart-pie"></i></button>
+                        <button type="button" class="btn btn-light" title="تصدير Excel" onclick="exportTableToExcel('guaranteesTable')"><i class="fas fa-file-excel text-success"></i></button>
+                        <button type="button" class="btn btn-light" title="معاينة الطباعة" onclick="window.print()"><i class="fas fa-print text-primary"></i></button>
+                     </div>
+
+                    <button type="button" id="applyFilterBtn" class="btn btn-primary px-4"><i class="fas fa-filter me-2"></i> تطبيق</button>
+                    <button type="button" id="clearFilterBtn" class="btn btn-light border"><i class="fas fa-times me-2"></i> مسح</button>
+                    
+                    <span class="badge bg-light text-primary p-2 px-3 rounded-pill border ms-2 align-self-center">
+                        <span id="rowCount">{{ guarantees|length }}</span>
+                    </span>
                 </div>
             </div>
-            <div class="col-md-2">
-                <select id="bankFilter" class="form-select">
-                    <option value="">كل البنوك</option>
-                    <option value="الراجحي">الراجحي</option>
-                    <option value="الأهلي">الأهلي</option>
-                    <option value="الرياض">الرياض</option>
-                    <option value="ساب">ساب</option>
-                    <option value="الإنماء">الإنماء</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select id="statusFilter" class="form-select">
-                    <option value="">كل الحالات</option>
-                    <option value="ساري">ساري</option>
-                    <option value="منتهي">منتهي</option>
-                    <option value="قارب على الانتهاء">قارب على الانتهاء</option>
-                    <option value="انتهى في انتظار التأكيد">انتظار التأكيد</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select id="typeFilter" class="form-select">
-                    <option value="">كل الأنواع</option>
-                    <option value="ابتدائي">ابتدائي</option>
-                    <option value="نهائي">نهائي</option>
-                    <option value="دفعة مقدمة">دفعة مقدمة</option>
-                    <option value="مالي">مالي</option>
-                </select>
-            </div>
-            <div class="col-md-2 text-end">
-                <span class="badge bg-light text-primary p-2 px-3 rounded-pill border">
-                    <i class="fas fa-list-ol me-1"></i> <span id="rowCount">{{ guarantees|length }}</span> ضمان
-                </span>
-            </div>
-        </div>
+        </form>
     </div>
 
     <!-- Main Table Card -->
@@ -245,6 +305,7 @@
                 <tbody id="tableBody">
                     {% for g in guarantees %}
                     <tr data-bank="{{ g.bank }}" data-status="{{ g.display_status }}" data-type="{{ g.g_type }}" 
+                        data-dept="{{ g.department }}" data-cash="{{ g.cash_flag }}"
                         data-search="{{ g.g_no }} {{ g.beneficiary }} {{ g.project_name }} {{ g.amount }} {{ g.requester }} {{ g.notes }} {{ g.entry_number }}">
                         <td class="text-muted small">{{ loop.index }}</td>
                         <td class="fw-bold text-primary" style="font-family: monospace; font-size: 1rem;">{{ g.g_no }}</td>
@@ -543,17 +604,49 @@
 </div>
 
 <script>
+    // Excel Export
+    function exportTableToExcel(tableID, filename = 'guarantees_data') {
+        var downloadLink;
+        var dataType = 'application/vnd.ms-excel';
+        var tableSelect = document.getElementById(tableID);
+        var tableHTML = tableSelect.outerHTML.replace(/ /g, '%20');
+        
+        filename = filename ? filename + '.xls' : 'excel_data.xls';
+        downloadLink = document.createElement("a");
+        document.body.appendChild(downloadLink);
+        
+        if(navigator.msSaveOrOpenBlob){
+            var blob = new Blob(['\ufeff', tableHTML], { type: dataType });
+            navigator.msSaveOrOpenBlob( blob, filename);
+        }else{
+            downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+            downloadLink.download = filename;
+            downloadLink.click();
+        }
+    }
+
     // Filter Logic
     const searchInput = document.getElementById('searchInput');
+    const deptFilter = document.getElementById('deptFilter');
     const bankFilter = document.getElementById('bankFilter');
+    const cashFilter = document.getElementById('cashFilter');
     const statusFilter = document.getElementById('statusFilter');
     const typeFilter = document.getElementById('typeFilter');
     const tableBody = document.getElementById('tableBody');
     const rowCount = document.getElementById('rowCount');
+    
+    // Buttons
+    const applyBtn = document.getElementById('applyFilterBtn');
+    const clearBtn = document.getElementById('clearFilterBtn');
 
     function filterTable() {
         const searchText = searchInput.value.toLowerCase();
+        // Multi-term search (OR logic with * delimiter)
+        const searchTerms = searchText.split('*').map(t => t.trim()).filter(t => t.length > 0);
+        
+        const dept = deptFilter.value;
         const bank = bankFilter.value;
+        const cash = cashFilter.value; // "0", "1", or ""
         const status = statusFilter.value;
         const type = typeFilter.value;
         
@@ -561,31 +654,40 @@
         const rows = tableBody.getElementsByTagName('tr');
 
         for (let row of rows) {
+            const rowDept = row.getAttribute('data-dept') || '';
             const rowBank = row.getAttribute('data-bank') || '';
+            const rowCash = row.getAttribute('data-cash') || '0';
             const rowStatus = row.getAttribute('data-status') || '';
             const rowType = row.getAttribute('data-type') || '';
             const rowSearch = row.getAttribute('data-search').toLowerCase();
 
-            const matchSearch = rowSearch.includes(searchText);
+            // 1. Search Logic (Multi-term OR)
+            let matchSearch = true;
+            if (searchTerms.length > 0) {
+                // If any term matches, it's a match (OR logic)
+                matchSearch = searchTerms.some(term => rowSearch.includes(term));
+            }
+
+            // 2. Filters
+            const matchDept = !dept || rowDept === dept;
             const matchBank = !bank || rowBank === bank;
             const matchType = !type || rowType === type;
+            
+            // Cash Filter: "1" = Cash, "0" = Credit (Facilities), "" = All
+            let matchCash = true;
+            if (cash === "1") {
+                matchCash = (rowCash == "1");
+            } else if (cash === "0") {
+                matchCash = (rowCash != "1");
+            }
 
+            // Status Filter
             let matchStatus = true;
             if (status) {
                 matchStatus = rowStatus === status;
-            } else {
-                // If "All" status selected:
-                // Hide "منتهي" unless searching (and finding a match)
-                if (rowStatus === 'منتهي') {
-                    if (searchText.length > 0 && matchSearch) {
-                        matchStatus = true;
-                    } else {
-                        matchStatus = false;
-                    }
-                }
             }
 
-            if (matchSearch && matchBank && matchStatus && matchType) {
+            if (matchSearch && matchDept && matchBank && matchCash && matchStatus && matchType) {
                 row.style.display = '';
                 visibleCount++;
                 // Update sequence number dynamically
@@ -599,12 +701,27 @@
         rowCount.textContent = visibleCount;
     }
 
+    // Event Listeners
     searchInput.addEventListener('keyup', filterTable);
+    deptFilter.addEventListener('change', filterTable);
     bankFilter.addEventListener('change', filterTable);
+    cashFilter.addEventListener('change', filterTable);
     statusFilter.addEventListener('change', filterTable);
     typeFilter.addEventListener('change', filterTable);
+    
+    if(applyBtn) applyBtn.addEventListener('click', filterTable);
+    
+    if(clearBtn) clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        deptFilter.value = '';
+        bankFilter.value = '';
+        cashFilter.value = '0'; // Default back to Credit
+        statusFilter.value = '';
+        typeFilter.value = '';
+        filterTable();
+    });
 
-    // Initial call to apply default filters (hide expired)
+    // Initial call
     filterTable();
 
     // Edit Modal Logic

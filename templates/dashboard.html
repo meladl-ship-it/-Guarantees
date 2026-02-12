@@ -140,6 +140,20 @@
                 <div class="stat-header">الضمانات السارية</div>
                 <div class="stat-value">{{ net_active_count }}</div>
                 <div style="font-size: 0.9rem; margin-top: 5px; color: #e67e22; font-weight: bold;">{{ "{:,.2f}".format(net_total_amount) }}</div>
+                
+                <!-- Breakdown -->
+                <div class="row border-top border-secondary border-opacity-25 pt-2 mt-2 mx-1">
+                    <div class="col-6 border-end border-secondary">
+                        <div style="font-size: 0.8rem; color: #7f8c8d;">تسهيلات</div>
+                        <div style="font-weight: bold; color: #2c3e50;">{{ active_credit_count }}</div>
+                        <div style="font-size: 0.7rem; color: #95a5a6;">{{ "{:,.0f}".format(active_credit_amount) }}</div>
+                    </div>
+                    <div class="col-6">
+                        <div style="font-size: 0.8rem; color: #7f8c8d;">نقدي</div>
+                        <div style="font-weight: bold; color: #2980b9;">{{ active_cash_count }}</div>
+                        <div style="font-size: 0.7rem; color: #95a5a6;">{{ "{:,.0f}".format(active_cash_amount) }}</div>
+                    </div>
+                </div>
             </div>
         </div>
         
