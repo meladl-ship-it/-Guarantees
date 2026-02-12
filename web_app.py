@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, redirect, session, flash, request, send_file
+from flask import Flask, render_template, url_for, redirect, session, flash, request, send_file, jsonify
 import sys
 import os
 import io
@@ -1038,7 +1038,7 @@ def index_logic(view_type='dashboard'):
             is_cash = (r.get('cash_flag') == 1)
             
             # تحديد الحالة
-            is_expired = (raw_status == 'منتهي')
+            is_expired = (raw_status in ['منتهي', 'مسترد'])
             
             # منطق تحديد الحالة للعرض (Status Chart & Table)
             display_status = raw_status
@@ -1139,26 +1139,51 @@ def index_logic(view_type='dashboard'):
 
         # ب. إحصائيات البنوك (استبعاد النقدي)
         bank_map = {}
-        # متغيرات لحساب الإحصائيات المطلوبة (قارب على الانتهاء & انتظار البنك)
+        # متغيرات لحساب الإحصائيات المطلوبة (قارب على الانتهاء & انتظار البنك) وتفصيلها نقدي/تسهيلات
         near_expiry_count = 0
         near_expiry_amount = 0.0
+        near_expiry_cash_count = 0
+        near_expiry_cash_amount = 0.0
+        near_expiry_credit_count = 0
+        near_expiry_credit_amount = 0.0
+
         pending_bank_count = 0
         pending_bank_amount = 0.0
+        pending_bank_cash_count = 0
+        pending_bank_cash_amount = 0.0
+        pending_bank_credit_count = 0
+        pending_bank_credit_amount = 0.0
 
         for r in active_rows:
             # حساب الإحصائيات المطلوبة
             status = r.get('display_status')
             amount_val = r.get('amount') or 0.0
+            is_cash_item = (r.get('cash_flag') == 1)
             
             if status == 'قارب على الانتهاء':
                 near_expiry_count += 1
                 near_expiry_amount += amount_val
+                
+                if is_cash_item:
+                    near_expiry_cash_count += 1
+                    near_expiry_cash_amount += amount_val
+                else:
+                    near_expiry_credit_count += 1
+                    near_expiry_credit_amount += amount_val
+                    
             elif status == 'انتهى في انتظار التأكيد':
                 pending_bank_count += 1
                 pending_bank_amount += amount_val
+                
+                if is_cash_item:
+                    pending_bank_cash_count += 1
+                    pending_bank_cash_amount += amount_val
+                else:
+                    pending_bank_credit_count += 1
+                    pending_bank_credit_amount += amount_val
 
             # استبعاد النقدي من إحصائيات المبالغ فقط
-            if r.get('cash_flag') == 1:
+            if is_cash_item:
                 continue
                 
             bank = r.get('bank') or 'غير محدد'
@@ -1213,8 +1238,16 @@ def index_logic(view_type='dashboard'):
                              active_credit_amount=active_credit_amount,
                              near_expiry_count=near_expiry_count,
                              near_expiry_amount=near_expiry_amount,
+                             near_expiry_cash_count=near_expiry_cash_count,
+                             near_expiry_cash_amount=near_expiry_cash_amount,
+                             near_expiry_credit_count=near_expiry_credit_count,
+                             near_expiry_credit_amount=near_expiry_credit_amount,
                              pending_bank_count=pending_bank_count,
                              pending_bank_amount=pending_bank_amount,
+                             pending_bank_cash_count=pending_bank_cash_count,
+                             pending_bank_cash_amount=pending_bank_cash_amount,
+                             pending_bank_credit_count=pending_bank_credit_count,
+                             pending_bank_credit_amount=pending_bank_credit_amount,
                              status_stats=status_stats,
                              bank_stats_top5=bank_stats_top5,
                              dept_stats=dept_stats,
@@ -1529,6 +1562,72 @@ def delete_guarantee(id):
         flash('حدث خطأ أثناء حذف الضمان', 'danger')
         
     return redirect(url_for('data_table'))
+
+@app.route('/guarantees/bulk_action', methods=['POST'])
+@login_required
+def bulk_action():
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'غير مصرح لك بهذا الإجراء'}), 403
+
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        ids = data.get('ids', [])
+
+        if not ids and action != 'deselect_all': # deselect_all is client side usually, but just in case
+            return jsonify({'success': False, 'message': 'لم يتم تحديد أي ضمانات'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        if action == 'delete':
+            # SQLite handles placeholders differently than Postgres if we construct query manually
+            # But we can use executemany or constructing IN clause
+            placeholders = ','.join(['?' for _ in ids])
+            query = f"DELETE FROM guarantees WHERE id IN ({placeholders})"
+            
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                query = query.replace('?', '%s')
+                
+            cursor.execute(query, ids)
+            conn.commit()
+            message = f'تم حذف {cursor.rowcount} ضمان/ضمانات بنجاح'
+
+        elif action == 'to_file':
+            placeholders = ','.join(['?' for _ in ids])
+            query = f"UPDATE guarantees SET user_status = ? WHERE id IN ({placeholders})"
+            params = ['ملف'] + ids
+            
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                query = query.replace('?', '%s')
+                
+            cursor.execute(query, params)
+            conn.commit()
+            message = f'تم تحويل {cursor.rowcount} ضمان/ضمانات إلى ملف'
+
+        elif action == 'clear_status': # "مسح" (Clear user_status / Auto)
+            placeholders = ','.join(['?' for _ in ids])
+            query = f"UPDATE guarantees SET user_status = ? WHERE id IN ({placeholders})"
+            params = [''] + ids
+            
+            if PSYCOPG2_AVAILABLE and isinstance(conn, psycopg2.extensions.connection):
+                query = query.replace('?', '%s')
+                
+            cursor.execute(query, params)
+            conn.commit()
+            message = f'تم مسح الحالة (تحويل لتلقائي) لـ {cursor.rowcount} ضمان/ضمانات'
+
+        else:
+            conn.close()
+            return jsonify({'success': False, 'message': 'إجراء غير معروف'}), 400
+
+        conn.close()
+        return jsonify({'success': True, 'message': message})
+
+    except Exception as e:
+        print(f"Error in bulk action: {e}")
+        return jsonify({'success': False, 'message': f'حدث خطأ: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     print("جاري تشغيل الموقع...")
