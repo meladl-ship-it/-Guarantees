@@ -11,11 +11,7 @@ from datetime import datetime, timedelta
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
-try:
-    # Removed Flask-Mail as per user request
-    pass
-except ImportError:
-    pass
+# Removed Flask-Mail as per user request
 
 from itsdangerous import URLSafeTimedSerializer
 
