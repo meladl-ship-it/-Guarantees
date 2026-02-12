@@ -157,7 +157,7 @@ class ReportsHandler:
             # --- Footer ---
             footer = section.footer
             p_footer = footer.paragraphs[0]
-            p_footer.text = "ادارة الضمانات - شركات ابو سرهد"
+            p_footer.text = "Abu Sarhad Group - Guarantees Management"
             p_footer.alignment = WD_ALIGN_PARAGRAPH.LEFT
             p_footer.style = doc.styles['Normal']
             p_footer.runs[0].font.size = Pt(10)

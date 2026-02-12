@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Guarantees Web Server
+title Abu Sarhad Web Server
 echo ===================================================
-echo      Guarantees System - Web Server Starting
+echo      Abu Sarhad System - Web Server Starting
 echo ===================================================
 echo.
 echo Please wait while the server starts...
