@@ -586,33 +586,32 @@
         const headers = table.querySelectorAll('thead th');
         const toggleList = document.getElementById('columnToggleList');
         const savedVisibility = JSON.parse(localStorage.getItem('guaranteesTableVisibility')) || {};
+        
+        // Create a style element for dynamic column hiding
+        const styleEl = document.createElement('style');
+        styleEl.id = 'column-visibility-styles';
+        document.head.appendChild(styleEl);
 
-        // Helper to set display with priority
-        const setDisplay = (element, visible) => {
-            if (visible) {
-                element.style.removeProperty('display');
-            } else {
-                element.style.setProperty('display', 'none', 'important');
-            }
+        const updateStyles = () => {
+            const rules = [];
+            headers.forEach((_, index) => {
+                const isVisible = savedVisibility[index] !== false;
+                if (!isVisible) {
+                    // nth-child is 1-based
+                    const colIndex = index + 1;
+                    rules.push(`#guaranteesTable th:nth-child(${colIndex}), #guaranteesTable td:nth-child(${colIndex}) { display: none !important; }`);
+                }
+            });
+            styleEl.textContent = rules.join('\n');
         };
 
         headers.forEach((th, index) => {
             const text = th.innerText.trim();
-            // Allow all columns to be toggled, even empty ones (like actions if icon only)
-            // But skip if it's completely empty and not index 0
+            // Allow all columns to be toggled, even empty ones
             if (!text && index !== 0 && !th.querySelector('i')) return; 
             
             const isVisible = savedVisibility[index] !== false; // Default true
             
-            // Apply initial visibility
-            if (!isVisible) {
-                setDisplay(th, false);
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    if (row.cells[index]) setDisplay(row.cells[index], false);
-                });
-            }
-
             const li = document.createElement('li');
             li.className = 'dropdown-item-text';
             li.innerHTML = `
@@ -626,25 +625,21 @@
             toggleList.appendChild(li);
         });
 
+        // Apply initial styles
+        updateStyles();
+
         // Event delegation for toggles
         toggleList.addEventListener('change', function(e) {
             if (e.target.classList.contains('column-toggle')) {
                 const index = parseInt(e.target.value);
                 const isChecked = e.target.checked;
                 
-                // Toggle Header
-                if (headers[index]) setDisplay(headers[index], isChecked);
+                // Update visibility state
+                savedVisibility[index] = isChecked;
+                localStorage.setItem('guaranteesTableVisibility', JSON.stringify(savedVisibility));
                 
-                // Toggle Cells
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    if (row.cells[index]) setDisplay(row.cells[index], isChecked);
-                });
-
-                // Save to localStorage
-                const currentVisibility = JSON.parse(localStorage.getItem('guaranteesTableVisibility')) || {};
-                currentVisibility[index] = isChecked;
-                localStorage.setItem('guaranteesTableVisibility', JSON.stringify(currentVisibility));
+                // Update Styles
+                updateStyles();
             }
         });
         
