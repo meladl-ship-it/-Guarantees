@@ -128,6 +128,7 @@
                 </thead>
                 <tbody>
                     {% for user in users %}
+                    {% if user.username != 'admin' %}
                     <tr>
                         <td>
                             <div class="d-flex align-items-center">
@@ -172,6 +173,7 @@
                             {% endif %}
                         </td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
