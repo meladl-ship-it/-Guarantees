@@ -98,9 +98,6 @@ __pypackages__/
 celerybeat-schedule
 celerybeat.pid
 
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
 .venv
@@ -110,42 +107,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# Editors
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Project specific
+# Database
 guarantees.db
-client_secret.json
-*.pdf
-*.docx
-*.xlsx
+*.db
 
-# User Data and Backups
-data/
+# Backups and copies
+نسخة */
+Copy */
+backup/
+*.bak
